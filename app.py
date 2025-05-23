@@ -1,35 +1,45 @@
+
 import streamlit as st
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import re
+import time
 
 BASE_URL = "https://live18.nowgoal25.com"
 
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"
-})
+# Configurar el driver de Selenium para Streamlit Cloud
+def get_driver():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920x1080")
+    chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+    chrome_options.binary_location = "/usr/bin/chromium-browser"
+    return webdriver.Chrome(options=chrome_options)
 
-def fetch_soup_requests(path):
+def fetch_soup_selenium(path):
     try:
         url = f"{BASE_URL}{path}"
-        resp = session.get(url, timeout=10)
-        resp.raise_for_status()
-
-        if "table_v1" not in resp.text and "table_v2" not in resp.text:
-            st.warning("La web cargó, pero no contiene los datos esperados. Probablemente NowGoal está bloqueando este servidor.")
-            return None
-
-        return BeautifulSoup(resp.text, "html.parser")
+        driver = get_driver()
+        driver.get(url)
+        time.sleep(2)
+        html = driver.page_source
+        driver.quit()
+        return BeautifulSoup(html, "html.parser")
     except Exception as e:
-        st.error(f"❌ Error al cargar {url} — {e}")
+        st.error(f"Error al obtener la página: {e}")
         return None
 
 def get_last_home(match_id):
-    soup = fetch_soup_requests(f"/match/h2h-{match_id}")
-    if not soup: return None, None
+    soup = fetch_soup_selenium(f"/match/h2h-{match_id}")
+    if not soup:
+        return None, None
     table = soup.find("table", id="table_v1")
-    if not table: return None, None
+    if not table:
+        return None, None
     for row in table.find_all("tr", id=re.compile(r"tr1_\d+")):
         if row.get("vs") == "1":
             key_match_id = row.get("index")
@@ -39,10 +49,12 @@ def get_last_home(match_id):
     return None, None
 
 def get_last_away(match_id):
-    soup = fetch_soup_requests(f"/match/h2h-{match_id}")
-    if not soup: return None, None
+    soup = fetch_soup_selenium(f"/match/h2h-{match_id}")
+    if not soup:
+        return None, None
     table = soup.find("table", id="table_v2")
-    if not table: return None, None
+    if not table:
+        return None, None
     for row in table.find_all("tr", id=re.compile(r"tr2_\d+")):
         if row.get("vs") == "1":
             key_match_id = row.get("index")
@@ -52,7 +64,7 @@ def get_last_away(match_id):
     return None, None
 
 def get_h2h_result(key_match_id, rival_a_id, rival_b_id):
-    soup = fetch_soup_requests(f"/match/h2h-{key_match_id}")
+    soup = fetch_soup_selenium(f"/match/h2h-{key_match_id}")
     if not soup:
         return "No se pudo cargar la página H2H"
     table = soup.find("table", id="table_v2")
@@ -69,7 +81,7 @@ def get_h2h_result(key_match_id, rival_a_id, rival_b_id):
     return "No se encontró el resultado entre esos equipos"
 
 # INTERFAZ STREAMLIT
-st.title("Predicción rápida desde Nowgoal por ID")
+st.title("Predicción rápida desde Nowgoal por ID (Selenium)")
 match_id = st.text_input("Introduce el ID del partido", value="2762052")
 
 if st.button("Consultar"):
