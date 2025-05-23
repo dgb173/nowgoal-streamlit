@@ -1,6 +1,3 @@
-!apt-get update -y && apt-get install -y chromium-chromedriver
-!cp /usr/lib/chromium-browser/chromedriver /usr/bin
-!pip install selenium beautifulsoup4 lxml requests ipywidgets
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
