@@ -11,14 +11,17 @@ BASE_URL = "https://live18.nowgoal25.com"
 # Configurar el driver de Selenium para Streamlit Cloud
 def get_driver():
     chrome_options = Options()
+    chrome_options.binary_location = "/usr/bin/chromium-browser"
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920x1080")
-    chrome_options.add_argument("--disable-features=VizDisplayCompositor")
-    chrome_options.binary_location = "/usr/bin/chromium-browser"
-    return webdriver.Chrome(options=chrome_options)
+
+    # Ruta explícita al chromedriver
+    chrome_service = Service("/usr/bin/chromedriver")
+    driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
+    return driver
 
 def fetch_soup_selenium(path):
     try:
