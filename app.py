@@ -1,33 +1,38 @@
-
 import streamlit as st
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
 import re
 import time
+import os
 
 BASE_URL = "https://live18.nowgoal25.com"
 
-# Configurar el driver de Selenium para Streamlit Cloud
 def get_driver():
     chrome_options = Options()
-    chrome_options.binary_location = "/usr/bin/chromium-browser"
+    # Rutas donde puede estar Chromium
+    possible_bins = ["/usr/bin/chromium-browser", "/usr/bin/chromium"]
+    for bin_path in possible_bins:
+        if os.path.exists(bin_path):
+            chrome_options.binary_location = bin_path
+            break
+    else:
+        st.error("No se encontró Chromium en el servidor.")
+        raise FileNotFoundError("Chromium no encontrado")
+
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920x1080")
 
-    # Ruta explícita al chromedriver
-    chrome_service = Service("/usr/bin/chromedriver")
-    driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
-    return driver
+    service = Service("/usr/bin/chromedriver")
+    return webdriver.Chrome(service=service, options=chrome_options)
 
 def fetch_soup_selenium(path):
+    url = f"{BASE_URL}{path}"
     try:
-        url = f"{BASE_URL}{path}"
         driver = get_driver()
         driver.get(url)
         time.sleep(2)
@@ -35,16 +40,14 @@ def fetch_soup_selenium(path):
         driver.quit()
         return BeautifulSoup(html, "html.parser")
     except Exception as e:
-        st.error(f"Error al obtener la página: {e}")
+        st.error(f"Error al obtener la página ({url}): {e}")
         return None
 
 def get_last_home(match_id):
     soup = fetch_soup_selenium(f"/match/h2h-{match_id}")
-    if not soup:
-        return None, None
+    if not soup: return None, None
     table = soup.find("table", id="table_v1")
-    if not table:
-        return None, None
+    if not table: return None, None
     for row in table.find_all("tr", id=re.compile(r"tr1_\d+")):
         if row.get("vs") == "1":
             key_match_id = row.get("index")
@@ -55,11 +58,9 @@ def get_last_home(match_id):
 
 def get_last_away(match_id):
     soup = fetch_soup_selenium(f"/match/h2h-{match_id}")
-    if not soup:
-        return None, None
+    if not soup: return None, None
     table = soup.find("table", id="table_v2")
-    if not table:
-        return None, None
+    if not table: return None, None
     for row in table.find_all("tr", id=re.compile(r"tr2_\d+")):
         if row.get("vs") == "1":
             key_match_id = row.get("index")
@@ -87,13 +88,12 @@ def get_h2h_result(key_match_id, rival_a_id, rival_b_id):
 
 # INTERFAZ STREAMLIT
 st.title("Predicción rápida desde Nowgoal por ID (Selenium)")
-match_id = st.text_input("Introduce el ID del partido", value="2762052")
 
+match_id = st.text_input("Introduce el ID del partido", value="2762052")
 if st.button("Consultar"):
     with st.spinner("Buscando datos..."):
         key_home_id, rival_a = get_last_home(match_id)
         key_away_id, rival_b = get_last_away(match_id)
-
         if key_home_id and rival_a and rival_b:
             resultado = get_h2h_result(key_home_id, rival_a, rival_b)
             st.success(resultado)
