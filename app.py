@@ -12,10 +12,17 @@ session.headers.update({
 
 def fetch_soup_requests(path):
     try:
-        resp = session.get(f"{BASE_URL}{path}", timeout=10)
+        url = f"{BASE_URL}{path}"
+        resp = session.get(url, timeout=10)
         resp.raise_for_status()
+
+        if "table_v1" not in resp.text and "table_v2" not in resp.text:
+            st.warning("La web cargó, pero no contiene los datos esperados. Probablemente NowGoal está bloqueando este servidor.")
+            return None
+
         return BeautifulSoup(resp.text, "html.parser")
-    except:
+    except Exception as e:
+        st.error(f"❌ Error al cargar {url} — {e}")
         return None
 
 def get_last_home(match_id):
@@ -61,7 +68,7 @@ def get_h2h_result(key_match_id, rival_a_id, rival_b_id):
             return f"Resultado: {score} | Hándicap: {handicap}"
     return "No se encontró el resultado entre esos equipos"
 
-# Interfaz Streamlit
+# INTERFAZ STREAMLIT
 st.title("Predicción rápida desde Nowgoal por ID")
 match_id = st.text_input("Introduce el ID del partido", value="2762052")
 
@@ -74,4 +81,4 @@ if st.button("Consultar"):
             resultado = get_h2h_result(key_home_id, rival_a, rival_b)
             st.success(resultado)
         else:
-            st.error("No se pudo obtener la información de rivales o partidos.")
+            st.error("❌ No se pudo obtener la información de rivales o partidos.")
