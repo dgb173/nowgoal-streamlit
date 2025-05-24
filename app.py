@@ -21,7 +21,7 @@ BASE_URL = "https://live18.nowgoal25.com"
 SELENIUM_TIMEOUT_SECONDS = 20
 
 # Configuración de la sesión de requests
-@st.cache_resource # Cache the session object
+@st.cache_resource 
 def get_requests_session():
     session = requests.Session()
     retries_req = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
@@ -32,7 +32,7 @@ def get_requests_session():
     return session
 
 # --- FUNCIONES DE REQUESTS ---
-@st.cache_data(ttl=3600) # Cache data for 1 hour
+@st.cache_data(ttl=3600) 
 def fetch_soup_requests(path, max_tries=3, delay=1):
     session = get_requests_session()
     url = f"{BASE_URL}{path}"
@@ -105,32 +105,25 @@ def get_h2h_details_selenium(key_match_id, rival_a_id, rival_b_id):
         return {"status": "error", "resultado": "N/A (IDs incompletos para H2H)"}
 
     url = f"{BASE_URL}/match/h2h-{key_match_id}"
-    # No mostramos este st.write aquí, lo haremos en la UI principal si es necesario
-    # st.write(f"  Cargando H2H con Selenium: {url} para {rival_a_id} vs {rival_b_id}")
-
     driver = get_selenium_driver()
     if not driver:
         return {"status": "error", "resultado": "N/A (Fallo al iniciar Selenium Driver)"}
 
     soup_selenium = None
-    page_source_for_debug = "" # Para depuración
     try:
-        st.write(f"⚙️ Accediendo a URL con Selenium: {url}") # Para feedback en UI
+        st.write(f"⚙️ Accediendo a URL con Selenium: {url}") 
         driver.get(url)
         WebDriverWait(driver, SELENIUM_TIMEOUT_SECONDS).until(
             EC.presence_of_element_located((By.ID, "table_v2"))
         )
         time.sleep(0.5)
-        page_source_for_debug = driver.page_source # Guardar para posible depuración
-        soup_selenium = BeautifulSoup(page_source_for_debug, "html.parser")
+        page_source = driver.page_source 
+        soup_selenium = BeautifulSoup(page_source, "html.parser")
     except TimeoutException:
         st.warning(f"⏳ Timeout en Selenium esperando #table_v2 en {url}")
         return {"status": "error", "resultado": "N/A (Timeout en Selenium)"}
     except Exception as e:
         st.error(f"❌ Error en Selenium durante carga/parseo: {e}")
-        # Opcional: Mostrar parte del page_source si falla el parseo
-        # with st.expander("Ver fuente de la página (parcial) en error de parseo"):
-        # st.code(page_source_for_debug[:2000])
         return {"status": "error", "resultado": f"N/A (Error Selenium: {type(e).__name__})"}
     finally:
         if driver:
@@ -141,9 +134,6 @@ def get_h2h_details_selenium(key_match_id, rival_a_id, rival_b_id):
 
     table = soup_selenium.find("table", id="table_v2")
     if not table:
-        # Opcional: Mostrar parte del page_source si no se encuentra la tabla
-        # with st.expander("Ver fuente de la página (parcial) si no se encuentra #table_v2"):
-        #     st.code(soup_selenium.prettify()[:2000])
         return {"status": "error", "resultado": "N/A (Tabla H2H no encontrada en Selenium)"}
 
     for row in table.find_all("tr", id=re.compile(r"tr2_\d+")):
@@ -179,16 +169,15 @@ def get_h2h_details_selenium(key_match_id, rival_a_id, rival_b_id):
                     if texto_celda != "" and texto_celda != "-":
                         handicap = texto_celda
             
-            rol_rival_a = "A" if away_id_found == str(rival_a_id) else "H" # Rol de Rival A en ESE partido H2H
+            rol_rival_a = "A" if away_id_found == str(rival_a_id) else "H" 
             return {
                 "status": "found",
-                "goles_home": goles_home, # Goles del equipo local DEL PARTIDO H2H
-                "goles_away": goles_away, # Goles del equipo visitante DEL PARTIDO H2H
+                "goles_home": goles_home, 
+                "goles_away": goles_away, 
                 "handicap": handicap,
-                "rol_rival_a": rol_rival_a, # Rol de Rival A en el partido H2H ('H' o 'A')
-                "raw_string": f"{goles_home}*{goles_away}/{handicap} {rol_rival_a}" # Tu formato original
+                "rol_rival_a": rol_rival_a, 
+                "raw_string": f"{goles_home}*{goles_away}/{handicap} {rol_rival_a}" 
             }
-
     return {"status": "not_found", "resultado": "N/A (H2H no encontrado para los rivales especificados)"}
 
 # --- STREAMLIT APP UI ---
@@ -196,18 +185,17 @@ st.set_page_config(page_title="Análisis H2H Nowgoal", layout="wide", initial_si
 st.title("🎯 Analizador de Partidos H2H - Nowgoal")
 st.markdown("Encuentra el resultado del enfrentamiento directo (H2H) entre los últimos oponentes de un equipo.")
 
-st.sidebar.image("https://nowgoal.com/img/logo.png", width=150) # Ejemplo, puedes cambiar la imagen
+st.sidebar.image("https://nowgoal.com/img/logo.png", width=150) 
 st.sidebar.header("Configuración del Análisis")
 
 main_match_id_input = st.sidebar.number_input(
     "🆔 ID del Partido Principal:",
-    value=2778543, # ID de prueba
+    value=2778543, 
     min_value=1,
     step=1,
     format="%d",
     help="Ingresa el ID del partido para el cual quieres encontrar los últimos oponentes y su H2H."
 )
-
 analizar_button = st.sidebar.button("🚀 Analizar Partido", type="primary", use_container_width=True)
 
 st.sidebar.markdown("---")
@@ -218,7 +206,6 @@ st.sidebar.info(
     "Finalmente, busca el resultado del enfrentamiento directo (H2H) entre esos dos oponentes."
 )
 st.sidebar.markdown("Creado con Streamlit por un entusiasta del análisis deportivo.")
-
 
 if analizar_button:
     if not main_match_id_input:
@@ -232,23 +219,26 @@ if analizar_button:
             key_away_id, rival_b = get_last_away(main_match_id_input)
 
         col_info1, col_info2 = st.columns(2)
+        rival_a_nombre_contexto = rival_a if rival_a else "No encontrado"
+        rival_b_nombre_contexto = rival_b if rival_b else "No encontrado"
+
         with col_info1:
             st.metric(
                 label="🏠 Rival A (Oponente del último partido en casa del equipo local del ID principal)",
-                value=rival_a if rival_a else "No encontrado",
+                value=rival_a_nombre_contexto,
                 delta=f"Partido clave H2H: {key_home_id}" if key_home_id else "N/A",
                 delta_color="off"
             )
         with col_info2:
             st.metric(
                 label="✈️ Rival B (Oponente del último partido fuera del equipo local del ID principal)",
-                value=rival_b if rival_b else "No encontrado",
+                value=rival_b_nombre_contexto,
                 delta=f"Partido clave H2H (Usado si no hay Rival A): {key_away_id}" if key_away_id else "N/A",
                 delta_color="off"
             )
         st.markdown("---")
 
-        details = {"status": "error", "resultado": "N/A"} # Default
+        details = {"status": "error", "resultado": "N/A"} 
         
         if key_home_id and rival_a and rival_b:
             if rival_a == rival_b:
@@ -260,102 +250,65 @@ if analizar_button:
         
         elif not key_home_id or not rival_a:
             st.error("❌ No se pudo determinar el Rival A (último oponente en casa) o su partido clave.")
-        elif not key_away_id or not rival_b: # Este caso podría ser menos común si siempre se usa key_home_id
+        elif not key_away_id or not rival_b: 
             st.error("❌ No se pudo determinar el Rival B (último oponente visitante) o su partido clave.")
         else:
             st.error("❌ Información de rivales incompleta, no se puede buscar H2H.")
 
-        # --- SECCIÓN DE RESULTADO ESPECTACULAR ---
+        # --- SECCIÓN DE RESULTADO ESPECTACULAR (SIMPLIFICADA) ---
         if details.get("status") == "found":
-            rival_a_nombre = rival_a if rival_a else "Rival A Desconocido"
-            rival_b_nombre = rival_b if rival_b else "Rival B Desconocido"
+            primary_result_display = details['raw_string'] 
 
-            # Determinar quién fue local y visitante EN EL PARTIDO H2H ANALIZADO
-            if details['rol_rival_a'] == 'H': # Rival A fue local en el H2H
-                h2h_local_team_id = rival_a_nombre
-                h2h_local_goles = details['goles_home']
-                h2h_away_team_id = rival_b_nombre
-                h2h_away_goles = details['goles_away']
-            else: # Rival A fue visitante en el H2H (implica que Rival B fue local)
-                h2h_local_team_id = rival_b_nombre
-                h2h_local_goles = details['goles_home']
-                h2h_away_team_id = rival_a_nombre
-                h2h_away_goles = details['goles_away']
-            
-            handicap_h2h = details['handicap']
-            rol_rival_a_en_h2h_display = "Local (H)" if details['rol_rival_a'] == "H" else "Visitante (A)"
-            
-            primary_result_display = details['raw_string']
-
-            bg_color = "#E0F2F7"  # Celeste muy claro
-            text_color_main = "#0D47A1" # Azul oscuro
-            border_color = "#B3E5FC" # Celeste medio
+            bg_color = "#E0F2F7" 
+            text_color_main = "#0D47A1" 
+            border_color = "#B3E5FC" 
 
             st.subheader(f"🌟 Resultado H2H Encontrado 🌟")
+            st.write(f"Este es el resultado del enfrentamiento directo entre **{rival_a_nombre_contexto}** y **{rival_b_nombre_contexto}**.")
             
             st.markdown(f"""
             <div style="
                 background-color: {bg_color};
-                padding: 20px;
+                padding: 25px; 
                 border-radius: 12px;
                 text-align: center;
                 border: 2px solid {border_color};
                 box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                 margin-bottom: 25px;
-                margin-top: 10px;
+                margin-top: 15px;
             ">
-                <p style="font-size: 1.1em; color: #37474F; margin-bottom: 8px; font-weight: 500;">
-                    Partido H2H analizado: <strong style="color:{text_color_main};">{h2h_local_team_id}</strong> (Local) vs <strong style="color:{text_color_main};">{h2h_away_team_id}</strong> (Visitante)
-                </p>
                 <h2 style="
                     color: {text_color_main};
-                    font-size: 3em; 
+                    font-size: 3.2em; 
                     font-weight: 700;
-                    margin-top: 5px;
+                    margin-top: 0;
                     margin-bottom:10px;
                     letter-spacing: 1px;
                 ">{primary_result_display}</h2>
                 <p style="font-size: 0.95em; color: #546E7A; margin-top: 5px;">
-                    Formato: GolesLocalDelH2H * GolesVisitanteDelH2H / Hándicap <strong style="color:{text_color_main};">Rol_Rival_A_en_H2H</strong>
+                    (Formato: GolesLocal<sub>del H2H</sub> * GolesVisitante<sub>del H2H</sub> / Hándicap   <strong>Rol de '{rival_a_nombre_contexto}' en este H2H</strong>)
                 </p>
             </div>
             """, unsafe_allow_html=True)
-
-            # --- DESGLOSE DETALLADO ---
-            st.markdown("#### 📋 Desglose Detallado del Partido H2H:")
             
-            col_desc1, col_desc2 = st.columns(2)
-
-            with col_desc1:
+            with st.expander("Ver desglose simple del resultado H2H", expanded=False):
+                rol_rival_a_en_h2h_display = "Local (H)" if details['rol_rival_a'] == "H" else "Visitante (A)"
                 st.markdown(f"""
-                <div style="padding: 12px; border-left: 4px solid #4CAF50; margin-bottom:12px; background-color:#F1F8E9; border-radius: 5px;">
-                    <strong style="font-size:1.15em; color:#2E7D32;">⚽ Goles del Partido H2H:</strong><br>
-                       Team {h2h_local_team_id} (Local): <strong style="font-size:1.1em;">{h2h_local_goles}</strong><br>
-                       Team {h2h_away_team_id} (Visitante): <strong style="font-size:1.1em;">{h2h_away_goles}</strong>
-                </div>
-                """, unsafe_allow_html=True)
+                    - **Resultado del Partido H2H:** {details['goles_home']} - {details['goles_away']}
+                    - **Hándicap del Partido H2H:** {details['handicap']}
+                    - **Rol de '{rival_a_nombre_contexto}' en el Partido H2H:** {rol_rival_a_en_h2h_display}
+                """)
 
-            with col_desc2:
-                st.markdown(f"""
-                <div style="padding: 12px; border-left: 4px solid #2196F3; margin-bottom:12px; background-color:#E3F2FD; border-radius: 5px;">
-                    <strong style="font-size:1.15em; color:#1565C0;">⚖️ Hándicap del Partido H2H:</strong> <strong style="font-size:1.1em;">{handicap_h2h}</strong><br>
-                    <strong style="font-size:1.15em; color:#1565C0;">🧭 Rol de '{rival_a_nombre}' en este H2H:</strong> <strong style="font-size:1.1em;">{rol_rival_a_en_h2h_display}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            h2h_url_selenium = f"{BASE_URL}/match/h2h-{key_home_id}"
+            h2h_url_selenium = f"{BASE_URL}/match/h2h-{key_home_id}" 
             st.markdown(f"<p style='text-align:center; margin-top:15px;'>🔗 <a href='{h2h_url_selenium}' target='_blank' style='color:{text_color_main};'>Ver datos fuente en Nowgoal (Partido Clave {key_home_id})</a></p>", unsafe_allow_html=True)
 
-
         elif details.get("status") in ["error", "not_found"]:
-            st.error(f"❌ No se pudo obtener el resultado H2H detallado entre **{rival_a if rival_a else 'Rival A'}** y **{rival_b if rival_b else 'Rival B'}**: {details.get('resultado')}")
-            # Opción para mostrar URL si hubo intento de Selenium
+            st.error(f"❌ No se pudo obtener el resultado H2H detallado entre **{rival_a_nombre_contexto}** y **{rival_b_nombre_contexto}**: {details.get('resultado')}")
             if (key_home_id and rival_a and rival_b):
                  h2h_url_selenium = f"{BASE_URL}/match/h2h-{key_home_id}"
                  st.info(f"Se intentó acceder a: {h2h_url_selenium}")
-        else: # Caso genérico por si algo muy raro pasa
+        else: 
              st.error("❌ Error desconocido al procesar el resultado H2H.")
-
 
         end_time = time.time()
         st.caption(f"⏱️ Tiempo total del análisis: {end_time - start_time:.2f} segundos")
