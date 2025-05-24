@@ -1,6 +1,6 @@
 # Si lo ejecutas localmente, asegúrate de haber instalado:
-#   apt-get update -y && apt-get install -y chromium-chromedriver
-#   pip install selenium beautifulsoup4 lxml requests streamlit
+apt-get update -y && apt-get install -y chromium-chromedriver
+pip install selenium beautifulsoup4 lxml requests streamlit
 
 import streamlit as st
 import time, re, requests
