@@ -1,4 +1,4 @@
-# streamlit_app_enhanced_es.py
+# streamlit_app_final_es.py
 
 import streamlit as st
 import time
@@ -7,7 +7,10 @@ import re
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import math # Para las funciones de formato de hándicap
+import math
+import os 
+import shutil 
+import logging # Para el logging detallado de webdriver-manager
 
 # Importaciones de Selenium
 from selenium import webdriver
@@ -15,16 +18,17 @@ from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.common.exceptions import TimeoutException, WebDriverException, SessionNotCreatedException
+from selenium.webdriver.chrome.service import Service as ChromeService # Importar Service
 
 # --- CONFIGURACIÓN GLOBAL ---
-BASE_URL_STREAMLIT_H2H = "https://live18.nowgoal25.com" # Para la lógica de rivales H2H
-BASE_URL_ELDEFINITIVO = "https://live16.nowgoal25.com" # Para la lógica de detalles del partido principal
+BASE_URL_STREAMLIT_H2H = "https://live18.nowgoal25.com"
+BASE_URL_ELDEFINITIVO = "https://live16.nowgoal25.com"
 SELENIUM_TIMEOUT_SECONDS = 20
-SELENIUM_TIMEOUT_ELDEFINITIVO = 25 # Puede necesitar más tiempo para la página completa
+SELENIUM_TIMEOUT_ELDEFINITIVO = 30
 
-# --- FUNCIONES DE FORMATEO DE HÁNDICAP (de Eldefinitivo.txt) ---
-@st.cache_data(show_spinner=False) # Cachear para rendimiento
+# --- FUNCIONES DE FORMATEO DE HÁNDICAP ---
+@st.cache_data(show_spinner=False)
 def parse_ah_to_number(ah_line_str: str):
     if not isinstance(ah_line_str, str): return None
     s = ah_line_str.strip().replace(' ', '')
@@ -35,100 +39,73 @@ def parse_ah_to_number(ah_line_str: str):
             parts = s.split('/')
             if len(parts) != 2: return None
             p1_str, p2_str = parts[0], parts[1]
-            try: val1 = float(p1_str)
+            try: val1 = float(p1_str); val2 = float(p2_str)
             except ValueError: return None
-            try: val2 = float(p2_str)
-            except ValueError: return None
-            if val1 < 0 and not p2_str.startswith('-') and val2 > 0:
-                val2 = -abs(val2)
-            elif original_starts_with_minus and val1 == 0.0 and \
-                 (p1_str == "0" or p1_str == "-0") and \
-                 not p2_str.startswith('-') and val2 > 0:
-                val2 = -abs(val2)
+            if val1 < 0 and not p2_str.startswith('-') and val2 > 0: val2 = -abs(val2)
+            elif original_starts_with_minus and val1 == 0.0 and (p1_str=="0" or p1_str=="-0") and not p2_str.startswith('-') and val2 > 0: val2 = -abs(val2)
             return (val1 + val2) / 2.0
-        else:
-            return float(s)
-    except ValueError:
-        return None
+        else: return float(s)
+    except ValueError: return None
 
-@st.cache_data(show_spinner=False) # Cachear para rendimiento
+@st.cache_data(show_spinner=False)
 def format_ah_as_decimal_string(ah_line_str: str):
     if not isinstance(ah_line_str, str) or not ah_line_str.strip() or ah_line_str.strip() in ['-', '?']:
         return ah_line_str.strip() if isinstance(ah_line_str, str) else '-'
     numeric_value = parse_ah_to_number(ah_line_str)
-    if numeric_value is None:
-        return ah_line_str.strip() if isinstance(ah_line_str, str) else '-'
+    if numeric_value is None: return ah_line_str.strip() if isinstance(ah_line_str, str) else '-'
     if numeric_value == 0.0: return "0"
     sign = -1 if numeric_value < 0 else 1
-    abs_num = abs(numeric_value)
-    parte_entera = math.floor(abs_num)
+    abs_num = abs(numeric_value); parte_entera = math.floor(abs_num)
     parte_decimal_original = round(abs_num - parte_entera, 4)
-    nueva_parte_decimal = parte_decimal_original
-    epsilon = 1e-9
+    nueva_parte_decimal = parte_decimal_original; epsilon = 1e-9
     if abs(parte_decimal_original - 0.25) < epsilon: nueva_parte_decimal = 0.5
     elif abs(parte_decimal_original - 0.75) < epsilon: nueva_parte_decimal = 0.5
-    
     if nueva_parte_decimal != 0.0 and nueva_parte_decimal != 0.5:
         if nueva_parte_decimal < 0.25: nueva_parte_decimal = 0.0
         elif nueva_parte_decimal < 0.75: nueva_parte_decimal = 0.5
-        else:
-             nueva_parte_decimal = 0.0
-             parte_entera +=1
+        else: nueva_parte_decimal = 0.0; parte_entera +=1
     resultado_num_redondeado = parte_entera + nueva_parte_decimal
     final_value_signed = sign * resultado_num_redondeado
     if final_value_signed == 0.0: return "0"
-    if abs(final_value_signed - round(final_value_signed)) < epsilon :
-        return str(int(round(final_value_signed)))
-    else:
-        return f"{final_value_signed:.1f}"
+    return str(int(round(final_value_signed))) if abs(final_value_signed - round(final_value_signed)) < epsilon else f"{final_value_signed:.1f}"
 
-# Configuración de la sesión de requests
+# --- SESIÓN DE REQUESTS ---
 @st.cache_resource
 def get_requests_session():
     session = requests.Session()
-    retries_req = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
-    adapter_req = HTTPAdapter(max_retries=retries_req)
-    session.mount("https://", adapter_req)
-    session.mount("http://", adapter_req)
-    session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36"})
+    retries = Retry(total=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("https://", adapter); session.mount("http://", adapter)
+    session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"})
     return session
 
-# --- FUNCIONES DE REQUESTS (para lógica H2H de rivales) ---
+# --- FUNCIONES DE REQUESTS PARA H2H DE RIVALES ---
 @st.cache_data(ttl=1800, show_spinner=False)
-def fetch_soup_requests_h2h_rivals(path, max_tries=3, delay=1):
-    session = get_requests_session()
-    url = f"{BASE_URL_STREAMLIT_H2H}{path}"
-    for attempt in range(1, max_tries + 1):
-        try:
-            resp = session.get(url, timeout=10)
-            resp.raise_for_status()
-            return BeautifulSoup(resp.text, "html.parser")
-        except requests.RequestException as e:
-            if attempt == max_tries:
-                st.error(f"Error final de Requests obteniendo {url} para H2H de rivales: {e}")
-                return None
-            time.sleep(delay * attempt)
-    return None
+def fetch_soup_requests_h2h_rivals(path):
+    session = get_requests_session(); url = f"{BASE_URL_STREAMLIT_H2H}{path}"
+    try:
+        resp = session.get(url, timeout=10); resp.raise_for_status()
+        return BeautifulSoup(resp.text, "html.parser")
+    except requests.RequestException as e:
+        st.error(f"Error de Requests (H2H Rivales) {url}: {e}")
+        return None
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_last_home_streamlit(match_id):
     soup = fetch_soup_requests_h2h_rivals(f"/match/h2h-{match_id}")
-    if not soup: return None, None, None, None
+    if not soup: return "Local (Error)", None, None, None
+    home_team_name_tag = soup.select_one("div.home .sclassName a") or soup.select_one("div.home .sclassName")
+    home_team_name = home_team_name_tag.text.strip() if home_team_name_tag else "Local Desconocido"
     table = soup.find("table", id="table_v1")
-    home_team_name_tag = soup.select_one("div.home .sclassName a")
-    home_team_name = home_team_name_tag.text.strip() if home_team_name_tag else "Equipo Local (Desconocido)"
-
     if not table: return home_team_name, None, None, None
     for row in table.find_all("tr", id=re.compile(r"tr1_\d+")):
         if row.get("vs") == "1":
             key_match_id = row.get("index")
-            if not key_match_id: continue
             onclicks = row.find_all("a", onclick=True)
-            if len(onclicks) > 1 and onclicks[1].get("onclick"):
+            if key_match_id and len(onclicks) > 1 and onclicks[1].get("onclick"):
                 rival_a_id_match = re.search(r"team\((\d+)\)", onclicks[1]["onclick"])
-                rival_a_name = onclicks[1].text.strip() if onclicks[1] else "Rival A (Desconocido)"
-                if rival_a_id_match:
-                    return home_team_name, key_match_id, rival_a_id_match.group(1), rival_a_name
+                rival_a_name = onclicks[1].text.strip() if onclicks[1] else "Rival A Desconocido"
+                if rival_a_id_match: return home_team_name, key_match_id, rival_a_id_match.group(1), rival_a_name
     return home_team_name, None, None, None
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -140,41 +117,107 @@ def get_last_away_streamlit(match_id):
     for row in table.find_all("tr", id=re.compile(r"tr2_\d+")):
         if row.get("vs") == "1":
             key_match_id = row.get("index")
-            if not key_match_id: continue
             onclicks = row.find_all("a", onclick=True)
-            if len(onclicks) > 0 and onclicks[0].get("onclick"):
+            if key_match_id and len(onclicks) > 0 and onclicks[0].get("onclick"):
                 rival_b_id_match = re.search(r"team\((\d+)\)", onclicks[0]["onclick"])
-                rival_b_name = onclicks[0].text.strip() if onclicks[0] else "Rival B (Desconocido)"
-                if rival_b_id_match:
-                    return key_match_id, rival_b_id_match.group(1), rival_b_name
+                rival_b_name = onclicks[0].text.strip() if onclicks[0] else "Rival B Desconocido"
+                if rival_b_id_match: return key_match_id, rival_b_id_match.group(1), rival_b_name
     return None, None, None
 
-# --- FUNCIONES DE SELENIUM (adaptadas y combinadas) ---
-@st.cache_resource 
+# --- FUNCIONES DE SELENIUM ---
+@st.cache_resource(show_spinner=False) 
 def get_selenium_driver_cached():
+    st.write("--- INICIANDO get_selenium_driver_cached ---")
     options = ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     options.add_argument('--blink-settings=imagesEnabled=false')
-    prefs = {"profile.managed_default_content_settings.images": 2, "profile.default_content_setting_values.notifications": 2}
+    prefs = {"profile.managed_default_content_settings.images": 2, 
+             "profile.default_content_setting_values.notifications": 2}
     options.add_experimental_option("prefs", prefs)
+
+    driver = None
+    webdriver_manager_log_path = os.path.join(os.path.expanduser("~"), ".wdm", "webdrivermanager.log")
+
     try:
+        st.write("✅ Intentando con `webdriver-manager`...")
+        from webdriver_manager.chrome import ChromeDriverManager # Movido aquí para que el ImportError sea específico
+        
+        # Configurar logging para webdriver-manager
+        # Esto necesita hacerse ANTES de cualquier llamada a ChromeDriverManager
+        # para que los logs se capturen correctamente.
+        # A veces, los logs de la librería pueden no aparecer directamente en st.write
+        # pero sí en la consola general de Streamlit Cloud.
+        wdm_logger = logging.getLogger('webdriver_manager')
+        wdm_logger.setLevel(logging.DEBUG)
+        # Podrías añadir un handler si quieres capturar los logs de wdm de forma más específica
+        # stream_handler = logging.StreamHandler(sys.stdout) # O a un archivo
+        # wdm_logger.addHandler(stream_handler) 
+        os.environ['WDM_LOG_LEVEL'] = 'DEBUG'
+        os.environ['WDM_PRINT_FIRST_LINE'] = 'True' # Ayuda a forzar la salida
+        st.write(f"ℹ️ Nivel de log de WDM establecido en DEBUG (variable de entorno).")
+
         try:
-            from webdriver_manager.chrome import ChromeDriverManager
-            from selenium.webdriver.chrome.service import Service as ChromeService
-            driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-        except ImportError:
-            st.warning("webdriver-manager no encontrado. Intentando usar ChromeDriver desde el PATH.")
-            driver = webdriver.Chrome(options=options)
+            cache_path = os.path.join(os.path.expanduser("~"), ".wdm")
+            if os.path.exists(cache_path):
+                st.write(f"🧹 Limpiando caché de webdriver-manager en: {cache_path}")
+                shutil.rmtree(cache_path)
+                st.write("✅ Caché de webdriver-manager limpiado.")
+        except Exception as e_cache:
+            st.write(f"⚠️ No se pudo limpiar caché de webdriver-manager: {e_cache}")
+
+        st.write("⏳ `ChromeDriverManager().install()` en progreso...")
+        driver_path = ChromeDriverManager().install()
+        st.write(f"✅ `webdriver-manager` indica que ChromeDriver está en: {driver_path}")
+        st.write(f"ℹ️ Verificando existencia del archivo: {os.path.exists(driver_path)}")
+
+        service = ChromeService(executable_path=driver_path)
+        driver = webdriver.Chrome(service=service, options=options)
+        st.success("✅ WebDriver inicializado exitosamente con `webdriver-manager`.")
+        
+        if os.path.exists(webdriver_manager_log_path):
+            try:
+                with open(webdriver_manager_log_path, "r") as f:
+                    st.text_area("Contenido de webdrivermanager.log:", f.read(), height=200)
+            except Exception as e_log_read:
+                st.write(f"⚠️ No se pudo leer webdrivermanager.log: {e_log_read}")
+        else:
+            st.write("ℹ️ No se encontró el archivo webdrivermanager.log en la ruta esperada.")
         return driver
-    except WebDriverException as e:
-        st.error(f"ERROR CRÍTICO SELENIUM: No se pudo iniciar ChromeDriver. {e}")
-        st.error("Asegúrate de que ChromeDriver (o chromium-chromedriver) esté instalado y sea accesible.")
-        st.info("Si usas Streamlit Cloud, añade 'chromium-chromedriver' a tu packages.txt. Si es local, asegúrate que ChromeDriver esté en tu PATH o instala 'webdriver-manager'.")
-        return None
+        
+    except ImportError:
+        st.error("❌ `webdriver-manager` no está instalado. ¡CRÍTICO! Asegúrate de que esté en `requirements.txt`.")
+        return None 
+    except SessionNotCreatedException as e_snc_wdm:
+        st.error(f"❌ ERROR DE CREACIÓN DE SESIÓN con `webdriver-manager`: {e_snc_wdm}")
+        st.long_text_area("Stacktrace (webdriver-manager):", str(getattr(e_snc_wdm, 'stacktrace', 'No disponible')), height=150)
+        st.error("Esto sugiere que incluso el driver descargado/gestionado por webdriver-manager no es compatible o hay un problema con el binario de Chrome.")
+    except Exception as e_wdm:
+        st.error(f"❌ Error inesperado durante la inicialización con `webdriver-manager`: {type(e_wdm).__name__}: {e_wdm}")
+        st.long_text_area("Stacktrace (webdriver-manager):", str(getattr(e_wdm, 'stacktrace', 'No disponible')), height=150)
+    
+    if driver is None:
+        st.write("--- INICIANDO FALLBACK AL PATH DEL SISTEMA ---")
+        try:
+            st.warning("⚠️ `webdriver-manager` falló. Intentando usar ChromeDriver desde el PATH del sistema (probablemente la versión incorrecta)...")
+            # Al usar el constructor sin 'service', Selenium busca en el PATH
+            driver = webdriver.Chrome(options=options) 
+            st.success("✅ WebDriver (del PATH) inicializado. PRECAUCIÓN: ESTO PODRÍA SER UNA VERSIÓN INCOMPATIBLE.")
+            return driver 
+        except SessionNotCreatedException as e_path_snc:
+            st.error(f"❌ ERROR DE CREACIÓN DE SESIÓN (PATH del sistema): {e_path_snc}")
+            st.long_text_area("Stacktrace (PATH):", str(getattr(e_path_snc, 'stacktrace', 'No disponible')), height=150)
+            st.error("Este es el error conocido de incompatibilidad de versiones. La solución principal es hacer que `webdriver-manager` funcione correctamente.")
+        except Exception as e_path:
+            st.error(f"❌ Error inesperado con ChromeDriver del PATH: {type(e_path).__name__}: {e_path}")
+            st.long_text_area("Stacktrace (PATH):", str(getattr(e_path, 'stacktrace', 'No disponible')), height=150)
+
+    st.error("🔴 No se pudo iniciar Selenium por ningún método.")
+    return None
 
 def get_h2h_details_selenium_streamlit_logic(driver, key_match_id, rival_a_id, rival_b_id):
     if not driver: return {"status": "error", "resultado": "Driver no disponible"}
@@ -218,7 +261,7 @@ def get_h2h_details_selenium_streamlit_logic(driver, key_match_id, rival_a_id, r
             if {home_id_found, away_id_found} == {str(rival_a_id), str(rival_b_id)}:
                 score_span = row.find("span", class_=table_info["score_class"])
                 if not score_span or not score_span.text or "-" not in score_span.text: continue
-                score = score_span.text.strip(); 
+                score = score_span.text.strip();
                 try: goles_home, goles_away = score.split("-")
                 except ValueError: continue
                 tds = row.find_all("td"); handicap_raw = "N/A"
@@ -237,7 +280,7 @@ def get_h2h_details_selenium_streamlit_logic(driver, key_match_id, rival_a_id, r
                         "raw_string_formatted": f"{goles_home.strip()}*{goles_away.strip()}/{handicap_formatted} {rol_rival_a}"}
     return {"status": "not_found", "resultado": f"H2H entre rivales {rival_a_id} y {rival_b_id} no encontrado en {url}"}
 
-# --- FUNCIONES PARA EXTRAER DETALLES DEL PARTIDO PRINCIPAL (Lógica de Eldefinitivo.txt) ---
+
 def extract_main_match_details_definitivo(driver, main_match_id):
     if not driver: return {"status": "error", "message": "Driver no disponible para detalles del partido."}
     url = f"{BASE_URL_ELDEFINITIVO}/match/h2h-{main_match_id}"
@@ -369,26 +412,26 @@ def extract_main_match_details_definitivo(driver, main_match_id):
                         last_away_opp_name_for_comp = data['home']
                         break
         
-        if details["home_team_main"] != "Local Desconocido" and last_away_opp_name_for_comp and table1:
-            for row_comp in table1.select('tr[id^="tr1_"]'): # Reutiliza home_hist_rows
+        if details["home_team_main"] != "Local Desconocido" and last_away_opp_name_for_comp and table1 :
+            for row_comp in table1.select('tr[id^="tr1_"]'): 
                 data = get_match_details_from_row_definitivo(row_comp, 'fscore_1')
                 if not data: continue
                 if (data['home'] == details["home_team_main"] and data['away'] == last_away_opp_name_for_comp):
-                    details["l_vs_uv_a_main"] = f"{data['score']}/{data['ahLine']} L" # Local jugó en Casa (H)
+                    details["l_vs_uv_a_main"] = f"{data['score']}/{data['ahLine']} (L)" 
                     break
                 elif (data['away'] == details["home_team_main"] and data['home'] == last_away_opp_name_for_comp):
-                    details["l_vs_uv_a_main"] = f"{data['score']}/{data['ahLine']} V" # Local jugó como Visitante (A)
+                    details["l_vs_uv_a_main"] = f"{data['score']}/{data['ahLine']} (V)" 
                     break
         
         if details["away_team_main"] != "Visitante Desconocido" and last_home_opp_name_for_comp and table2:
-            for row_comp in table2.select('tr[id^="tr2_"]'): # Reutiliza away_hist_rows
+            for row_comp in table2.select('tr[id^="tr2_"]'): 
                 data = get_match_details_from_row_definitivo(row_comp, 'fscore_2')
                 if not data: continue
                 if (data['home'] == details["away_team_main"] and data['away'] == last_home_opp_name_for_comp):
-                    details["v_vs_ul_h_main"] = f"{data['score']}/{data['ahLine']} L" # Visitante jugó en Casa (H)
+                    details["v_vs_ul_h_main"] = f"{data['score']}/{data['ahLine']} (L)" 
                     break
                 elif (data['away'] == details["away_team_main"] and data['home'] == last_home_opp_name_for_comp):
-                    details["v_vs_ul_h_main"] = f"{data['score']}/{data['ahLine']} V" # Visitante jugó como Visitante (A)
+                    details["v_vs_ul_h_main"] = f"{data['score']}/{data['ahLine']} (V)" 
                     break
 
         def safe_int_def(value, default=0):
@@ -420,11 +463,11 @@ def extract_main_match_details_definitivo(driver, main_match_id):
                 stats_parts = []
                 if s_total:
                     stats_parts.append(f"🏆Clasif.:{s_total.get('rank','N/A')}")
-                    stats_parts.append(f"🌍Total: {s_total.get('m',0)}|{s_total.get('w',0)}/{s_total.get('d',0)}/{s_total.get('l',0)} ({s_total.get('gf',0)}-{s_total.get('ga',0)})")
+                    stats_parts.append(f"🌍Total: {s_total.get('m',0)} PJ ({s_total.get('w',0)}G-{s_total.get('d',0)}E-{s_total.get('l',0)}P) {s_total.get('gf',0)}GF-{s_total.get('ga',0)}GC")
                 if s_loc_aw:
                     loc_label = "🏠Local:" if is_home_team else "✈️Visit.:"
-                    stats_parts.append(f"{loc_label} {s_loc_aw.get('m',0)}|{s_loc_aw.get('w',0)}/{s_loc_aw.get('d',0)}/{s_loc_aw.get('l',0)} ({s_loc_aw.get('gf',0)}-{s_loc_aw.get('ga',0)})")
-                if stats_parts: stats_text = "  ".join(stats_parts)
+                    stats_parts.append(f"{loc_label} {s_loc_aw.get('m',0)} PJ ({s_loc_aw.get('w',0)}G-{s_loc_aw.get('d',0)}E-{s_loc_aw.get('l',0)}P) {s_loc_aw.get('gf',0)}GF-{s_loc_aw.get('ga',0)}GC")
+                if stats_parts: stats_text = "\n".join(stats_parts)
             return stats_text
         details["stats_l_main"] = extract_team_stats_from_summary_def(soup, 'table.team-table-home', True)
         details["stats_v_main"] = extract_team_stats_from_summary_def(soup, 'table.team-table-guest', False)
@@ -459,18 +502,26 @@ if analizar_button:
         st.warning("⚠️ Por favor, ingresa un ID de partido válido.")
     else:
         st.header(f"📊 Resultados del Análisis para Partido ID: {main_match_id_input}")
-        if st.session_state.driver is None:
-            with st.spinner("Iniciando WebDriver de Selenium... (puede tardar la primera vez)"):
+        if st.session_state.driver is None or not hasattr(st.session_state.driver, 'window_handles'):
+            if st.session_state.driver is not None:
+                try: st.session_state.driver.quit()
+                except: pass
+            # Envolver la inicialización del driver en su propio spinner
+            with st.spinner("Preparando el motor de análisis (Selenium)... Esto puede tardar unos momentos."):
                 st.session_state.driver = get_selenium_driver_cached()
+        
         driver = st.session_state.driver
+        
         if not driver:
-            st.error("🔴 No se pudo iniciar Selenium. El análisis no puede continuar.")
+            st.error("🔴 No se pudo iniciar Selenium. El análisis no puede continuar. Revisa los mensajes de error en la consola o logs.")
         else:
             start_time_analysis = time.time()
+            # --- ANÁLISIS 1: H2H DE RIVALES ---
             st.subheader("Análisis 1: H2H de Oponentes del Equipo Local")
             with st.spinner(f"Obteniendo Rival A y Rival B para el equipo local de {main_match_id_input}..."):
                 home_team_name_main, key_home_id_rival_a_context, rival_a_id, rival_a_name = get_last_home_streamlit(main_match_id_input)
                 _, rival_b_id, rival_b_name = get_last_away_streamlit(main_match_id_input)
+            
             st.write(f"Equipo Local del Partido Principal ({main_match_id_input}): **{home_team_name_main or 'No encontrado'}**")
             col_rival1, col_rival2 = st.columns(2)
             with col_rival1:
@@ -501,6 +552,7 @@ if analizar_button:
             else: st.error(f"❌ H2H de Oponentes: {details_rival_h2h.get('resultado', 'Error desconocido')}")
             st.markdown("---")
 
+            # --- ANÁLISIS 2: DETALLES DEL PARTIDO PRINCIPAL ---
             st.subheader(f"Análisis 2: Detalles del Partido Principal ID {main_match_id_input}")
             with st.spinner(f"Extrayendo detalles completos para el partido {main_match_id_input} usando Selenium..."):
                 main_match_data = extract_main_match_details_definitivo(driver, main_match_id_input)
@@ -509,7 +561,7 @@ if analizar_button:
                 st.success(f"✅ {main_match_data.get('message', 'Datos extraídos.')}")
                 m = main_match_data
                 st.markdown(f"""#### Información del Partido: {m.get('home_team_main','N/A')} vs {m.get('away_team_main','N/A')}
-                **Liga:** {m.get('league_main','N/A')} | **ID:** {m.get('id','N/A')} | **Resultado Actual/Final:** {m.get('fin_main','N/A')}""")
+                **Liga:** {m.get('league_main','N/A')} | **ID:** {m.get('id','N/A')} | **Resultado Actual/Final:** `{m.get('fin_main','N/A')}`""")
                 
                 st.markdown("##### Líneas Principales del Partido")
                 col_lineas1, col_lineas2 = st.columns(2)
@@ -517,16 +569,16 @@ if analizar_button:
                 with col_lineas2: st.metric("Goles Más/Menos (Actual)", m.get('g_i_main','N/A'))
 
                 st.markdown("##### Comparativas Históricas (Partido Principal)")
-                c1, c2, c3 = st.columns(Spec=[0.35,0.3,0.35]) # Ajuste de ancho
+                c1, c2, c3 = st.columns([0.4,0.3,0.3]) 
                 with c1:
                     st.markdown(f"**H2H (vs {m.get('away_team_main','Visitante')})**")
                     st.caption(f"Local: `{m.get('res_h2h_v_main','N/A')}` AH: `{m.get('ah_h2h_v_main','N/A')}`")
                     st.caption(f"Global: `{m.get('res_h2h_g_main','N/A')}` AH: `{m.get('ah_h2h_g_main','N/A')}`")
                 with c2:
-                    st.markdown(f"**Último de {m.get('home_team_main','Local')} (Local)**")
+                    st.markdown(f"**Últ. {m.get('home_team_main','Local')} (L)**")
                     st.caption(f"Res: `{m.get('res_l_h_main','N/A')}` AH: `{m.get('ah_l_h_main','N/A')}`")
                 with c3:
-                    st.markdown(f"**Último de {m.get('away_team_main','Visitante')} (Visitante)**")
+                    st.markdown(f"**Últ. {m.get('away_team_main','Visitante')} (V)**")
                     st.caption(f"Res: `{m.get('res_v_a_main','N/A')}` AH: `{m.get('ah_v_a_main','N/A')}`")
 
                 st.markdown("##### H2H Cruzados (vs Oponentes Recientes)")
@@ -536,9 +588,10 @@ if analizar_button:
                 
                 st.markdown("##### Estadísticas de Equipos (Total / Local o Visitante)")
                 exp_stats_l = st.expander(f"Estadísticas de {m.get('home_team_main','Local')}", expanded=False)
-                exp_stats_l.text_area("", value=m.get('stats_l_main','N/A'), height=80,label_visibility="collapsed", disabled=True)
+                # Usar una clave única para cada text_area si se generan dinámicamente
+                exp_stats_l.text_area(f"Stats_L_{main_match_id_input}", value=m.get('stats_l_main','N/A'), height=100,label_visibility="collapsed", disabled=True, key=f"stats_l_{main_match_id_input}")
                 exp_stats_v = st.expander(f"Estadísticas de {m.get('away_team_main','Visitante')}", expanded=False)
-                exp_stats_v.text_area("", value=m.get('stats_v_main','N/A'), height=80,label_visibility="collapsed", disabled=True)
+                exp_stats_v.text_area(f"Stats_V_{main_match_id_input}",value=m.get('stats_v_main','N/A'), height=100,label_visibility="collapsed", disabled=True, key=f"stats_v_{main_match_id_input}")
 
             elif main_match_data.get("status") == "not_found": st.error(f"❌ No se encontraron datos para el partido principal {main_match_id_input} en {BASE_URL_ELDEFINITIVO}.")
             else: st.error(f"❌ Error obteniendo detalles del partido principal: {main_match_data.get('message', 'Error desconocido')}")
