@@ -8,10 +8,5 @@ gspread_dataframe # if you use it
 psutil # if you use it
 requests_html # if you use it
 urllib3
-streamlit
-requests
-beautifulsoup4
-selenium
 webdriver-manager
-chromium-chromedriver
-chromium
+
