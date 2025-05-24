@@ -1,4 +1,4 @@
-# streamlit_app_final_es.py
+# streamlit_app_final_es_v_force.py
 
 import streamlit as st
 import time
@@ -10,7 +10,7 @@ from urllib3.util.retry import Retry
 import math
 import os 
 import shutil 
-import logging # Para el logging detallado de webdriver-manager
+import logging 
 
 # Importaciones de Selenium
 from selenium import webdriver
@@ -19,7 +19,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException, SessionNotCreatedException
-from selenium.webdriver.chrome.service import Service as ChromeService # Importar Service
+from selenium.webdriver.chrome.service import Service as ChromeService
 
 # --- CONFIGURACIÓN GLOBAL ---
 BASE_URL_STREAMLIT_H2H = "https://live18.nowgoal25.com"
@@ -145,20 +145,12 @@ def get_selenium_driver_cached():
 
     try:
         st.write("✅ Intentando con `webdriver-manager`...")
-        from webdriver_manager.chrome import ChromeDriverManager # Movido aquí para que el ImportError sea específico
+        from webdriver_manager.chrome import ChromeDriverManager
         
-        # Configurar logging para webdriver-manager
-        # Esto necesita hacerse ANTES de cualquier llamada a ChromeDriverManager
-        # para que los logs se capturen correctamente.
-        # A veces, los logs de la librería pueden no aparecer directamente en st.write
-        # pero sí en la consola general de Streamlit Cloud.
         wdm_logger = logging.getLogger('webdriver_manager')
         wdm_logger.setLevel(logging.DEBUG)
-        # Podrías añadir un handler si quieres capturar los logs de wdm de forma más específica
-        # stream_handler = logging.StreamHandler(sys.stdout) # O a un archivo
-        # wdm_logger.addHandler(stream_handler) 
         os.environ['WDM_LOG_LEVEL'] = 'DEBUG'
-        os.environ['WDM_PRINT_FIRST_LINE'] = 'True' # Ayuda a forzar la salida
+        os.environ['WDM_PRINT_FIRST_LINE'] = 'True'
         st.write(f"ℹ️ Nivel de log de WDM establecido en DEBUG (variable de entorno).")
 
         try:
@@ -171,18 +163,24 @@ def get_selenium_driver_cached():
             st.write(f"⚠️ No se pudo limpiar caché de webdriver-manager: {e_cache}")
 
         st.write("⏳ `ChromeDriverManager().install()` en progreso...")
-        driver_path = ChromeDriverManager().install()
-        st.write(f"✅ `webdriver-manager` indica que ChromeDriver está en: {driver_path}")
+        
+        # --- FORZAR VERSIÓN DE CHROMEDRIVER ---
+        chrome_driver_version_to_force = "120" 
+        st.write(f"ℹ️ Intentando instalar ChromeDriver para la versión de Chrome ~{chrome_driver_version_to_force}...")
+        driver_path = ChromeDriverManager(version=chrome_driver_version_to_force).install()
+        
+        st.write(f"✅ `webdriver-manager` (versión forzada ~{chrome_driver_version_to_force}) indica que ChromeDriver está en: {driver_path}")
         st.write(f"ℹ️ Verificando existencia del archivo: {os.path.exists(driver_path)}")
 
         service = ChromeService(executable_path=driver_path)
         driver = webdriver.Chrome(service=service, options=options)
-        st.success("✅ WebDriver inicializado exitosamente con `webdriver-manager`.")
+        st.success(f"✅ WebDriver inicializado exitosamente con `webdriver-manager` (versión forzada ~{chrome_driver_version_to_force}).")
         
         if os.path.exists(webdriver_manager_log_path):
             try:
                 with open(webdriver_manager_log_path, "r") as f:
-                    st.text_area("Contenido de webdrivermanager.log:", f.read(), height=200)
+                    # st.text_area("Contenido de webdrivermanager.log:", f.read(), height=200) # Comentado para no saturar UI
+                    st.write("ℹ️ Log de webdriver-manager existe (contenido no mostrado aquí para brevedad).")
             except Exception as e_log_read:
                 st.write(f"⚠️ No se pudo leer webdrivermanager.log: {e_log_read}")
         else:
@@ -194,27 +192,26 @@ def get_selenium_driver_cached():
         return None 
     except SessionNotCreatedException as e_snc_wdm:
         st.error(f"❌ ERROR DE CREACIÓN DE SESIÓN con `webdriver-manager`: {e_snc_wdm}")
-        st.long_text_area("Stacktrace (webdriver-manager):", str(getattr(e_snc_wdm, 'stacktrace', 'No disponible')), height=150)
+        # st.long_text_area("Stacktrace (webdriver-manager):", str(getattr(e_snc_wdm, 'stacktrace', 'No disponible')), height=150)
         st.error("Esto sugiere que incluso el driver descargado/gestionado por webdriver-manager no es compatible o hay un problema con el binario de Chrome.")
     except Exception as e_wdm:
         st.error(f"❌ Error inesperado durante la inicialización con `webdriver-manager`: {type(e_wdm).__name__}: {e_wdm}")
-        st.long_text_area("Stacktrace (webdriver-manager):", str(getattr(e_wdm, 'stacktrace', 'No disponible')), height=150)
+        # st.long_text_area("Stacktrace (webdriver-manager):", str(getattr(e_wdm, 'stacktrace', 'No disponible')), height=150)
     
     if driver is None:
         st.write("--- INICIANDO FALLBACK AL PATH DEL SISTEMA ---")
         try:
             st.warning("⚠️ `webdriver-manager` falló. Intentando usar ChromeDriver desde el PATH del sistema (probablemente la versión incorrecta)...")
-            # Al usar el constructor sin 'service', Selenium busca en el PATH
             driver = webdriver.Chrome(options=options) 
             st.success("✅ WebDriver (del PATH) inicializado. PRECAUCIÓN: ESTO PODRÍA SER UNA VERSIÓN INCOMPATIBLE.")
             return driver 
         except SessionNotCreatedException as e_path_snc:
             st.error(f"❌ ERROR DE CREACIÓN DE SESIÓN (PATH del sistema): {e_path_snc}")
-            st.long_text_area("Stacktrace (PATH):", str(getattr(e_path_snc, 'stacktrace', 'No disponible')), height=150)
+            # st.long_text_area("Stacktrace (PATH):", str(getattr(e_path_snc, 'stacktrace', 'No disponible')), height=150)
             st.error("Este es el error conocido de incompatibilidad de versiones. La solución principal es hacer que `webdriver-manager` funcione correctamente.")
         except Exception as e_path:
             st.error(f"❌ Error inesperado con ChromeDriver del PATH: {type(e_path).__name__}: {e_path}")
-            st.long_text_area("Stacktrace (PATH):", str(getattr(e_path, 'stacktrace', 'No disponible')), height=150)
+            # st.long_text_area("Stacktrace (PATH):", str(getattr(e_path, 'stacktrace', 'No disponible')), height=150)
 
     st.error("🔴 No se pudo iniciar Selenium por ningún método.")
     return None
@@ -506,7 +503,6 @@ if analizar_button:
             if st.session_state.driver is not None:
                 try: st.session_state.driver.quit()
                 except: pass
-            # Envolver la inicialización del driver en su propio spinner
             with st.spinner("Preparando el motor de análisis (Selenium)... Esto puede tardar unos momentos."):
                 st.session_state.driver = get_selenium_driver_cached()
         
@@ -588,7 +584,6 @@ if analizar_button:
                 
                 st.markdown("##### Estadísticas de Equipos (Total / Local o Visitante)")
                 exp_stats_l = st.expander(f"Estadísticas de {m.get('home_team_main','Local')}", expanded=False)
-                # Usar una clave única para cada text_area si se generan dinámicamente
                 exp_stats_l.text_area(f"Stats_L_{main_match_id_input}", value=m.get('stats_l_main','N/A'), height=100,label_visibility="collapsed", disabled=True, key=f"stats_l_{main_match_id_input}")
                 exp_stats_v = st.expander(f"Estadísticas de {m.get('away_team_main','Visitante')}", expanded=False)
                 exp_stats_v.text_area(f"Stats_V_{main_match_id_input}",value=m.get('stats_v_main','N/A'), height=100,label_visibility="collapsed", disabled=True, key=f"stats_v_{main_match_id_input}")
