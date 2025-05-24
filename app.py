@@ -1,4 +1,4 @@
-# streamlit_app_final_es_v_force.py
+# streamlit_app_final_es_v_force_complete.py
 
 import streamlit as st
 import time
@@ -141,17 +141,18 @@ def get_selenium_driver_cached():
     options.add_experimental_option("prefs", prefs)
 
     driver = None
-    webdriver_manager_log_path = os.path.join(os.path.expanduser("~"), ".wdm", "webdrivermanager.log")
+    # webdriver_manager_log_path = os.path.join(os.path.expanduser("~"), ".wdm", "webdrivermanager.log") # Comentado para simplificar
 
     try:
         st.write("✅ Intentando con `webdriver-manager`...")
         from webdriver_manager.chrome import ChromeDriverManager
         
-        wdm_logger = logging.getLogger('webdriver_manager')
-        wdm_logger.setLevel(logging.DEBUG)
-        os.environ['WDM_LOG_LEVEL'] = 'DEBUG'
-        os.environ['WDM_PRINT_FIRST_LINE'] = 'True'
-        st.write(f"ℹ️ Nivel de log de WDM establecido en DEBUG (variable de entorno).")
+        # Configurar logging para webdriver-manager (opcional pero puede ser útil)
+        # wdm_logger = logging.getLogger('webdriver_manager')
+        # wdm_logger.setLevel(logging.DEBUG)
+        # os.environ['WDM_LOG_LEVEL'] = 'DEBUG'
+        # os.environ['WDM_PRINT_FIRST_LINE'] = 'True'
+        # st.write(f"ℹ️ Nivel de log de WDM establecido en DEBUG (variable de entorno).")
 
         try:
             cache_path = os.path.join(os.path.expanduser("~"), ".wdm")
@@ -163,9 +164,7 @@ def get_selenium_driver_cached():
             st.write(f"⚠️ No se pudo limpiar caché de webdriver-manager: {e_cache}")
 
         st.write("⏳ `ChromeDriverManager().install()` en progreso...")
-        
-        # --- FORZAR VERSIÓN DE CHROMEDRIVER ---
-        chrome_driver_version_to_force = "120" 
+        chrome_driver_version_to_force = "120" # Forzar versión
         st.write(f"ℹ️ Intentando instalar ChromeDriver para la versión de Chrome ~{chrome_driver_version_to_force}...")
         driver_path = ChromeDriverManager(version=chrome_driver_version_to_force).install()
         
@@ -175,16 +174,6 @@ def get_selenium_driver_cached():
         service = ChromeService(executable_path=driver_path)
         driver = webdriver.Chrome(service=service, options=options)
         st.success(f"✅ WebDriver inicializado exitosamente con `webdriver-manager` (versión forzada ~{chrome_driver_version_to_force}).")
-        
-        if os.path.exists(webdriver_manager_log_path):
-            try:
-                with open(webdriver_manager_log_path, "r") as f:
-                    # st.text_area("Contenido de webdrivermanager.log:", f.read(), height=200) # Comentado para no saturar UI
-                    st.write("ℹ️ Log de webdriver-manager existe (contenido no mostrado aquí para brevedad).")
-            except Exception as e_log_read:
-                st.write(f"⚠️ No se pudo leer webdrivermanager.log: {e_log_read}")
-        else:
-            st.write("ℹ️ No se encontró el archivo webdrivermanager.log en la ruta esperada.")
         return driver
         
     except ImportError:
@@ -192,31 +181,29 @@ def get_selenium_driver_cached():
         return None 
     except SessionNotCreatedException as e_snc_wdm:
         st.error(f"❌ ERROR DE CREACIÓN DE SESIÓN con `webdriver-manager`: {e_snc_wdm}")
-        # st.long_text_area("Stacktrace (webdriver-manager):", str(getattr(e_snc_wdm, 'stacktrace', 'No disponible')), height=150)
-        st.error("Esto sugiere que incluso el driver descargado/gestionado por webdriver-manager no es compatible o hay un problema con el binario de Chrome.")
+        st.error("   Stacktrace (parcial): " + str(getattr(e_snc_wdm, 'msg', 'No disponible'))) # Mostrar mensaje del error
     except Exception as e_wdm:
         st.error(f"❌ Error inesperado durante la inicialización con `webdriver-manager`: {type(e_wdm).__name__}: {e_wdm}")
-        # st.long_text_area("Stacktrace (webdriver-manager):", str(getattr(e_wdm, 'stacktrace', 'No disponible')), height=150)
     
-    if driver is None:
+    if driver is None: # Si webdriver-manager falló por una razón que no sea ImportError
         st.write("--- INICIANDO FALLBACK AL PATH DEL SISTEMA ---")
         try:
-            st.warning("⚠️ `webdriver-manager` falló. Intentando usar ChromeDriver desde el PATH del sistema (probablemente la versión incorrecta)...")
+            st.warning("⚠️ `webdriver-manager` falló. Intentando usar ChromeDriver desde el PATH del sistema...")
             driver = webdriver.Chrome(options=options) 
             st.success("✅ WebDriver (del PATH) inicializado. PRECAUCIÓN: ESTO PODRÍA SER UNA VERSIÓN INCOMPATIBLE.")
             return driver 
         except SessionNotCreatedException as e_path_snc:
             st.error(f"❌ ERROR DE CREACIÓN DE SESIÓN (PATH del sistema): {e_path_snc}")
-            # st.long_text_area("Stacktrace (PATH):", str(getattr(e_path_snc, 'stacktrace', 'No disponible')), height=150)
-            st.error("Este es el error conocido de incompatibilidad de versiones. La solución principal es hacer que `webdriver-manager` funcione correctamente.")
+            st.error("   Stacktrace (parcial): " + str(getattr(e_path_snc, 'msg', 'No disponible')))
+            st.error("Este es el error conocido de incompatibilidad de versiones. La solución principal es hacer que `webdriver-manager` funcione.")
         except Exception as e_path:
             st.error(f"❌ Error inesperado con ChromeDriver del PATH: {type(e_path).__name__}: {e_path}")
-            # st.long_text_area("Stacktrace (PATH):", str(getattr(e_path, 'stacktrace', 'No disponible')), height=150)
 
     st.error("🔴 No se pudo iniciar Selenium por ningún método.")
     return None
 
 def get_h2h_details_selenium_streamlit_logic(driver, key_match_id, rival_a_id, rival_b_id):
+    # ... (COPIA LA FUNCIÓN COMPLETA DE TU VERSIÓN ANTERIOR) ...
     if not driver: return {"status": "error", "resultado": "Driver no disponible"}
     if not key_match_id or not rival_a_id or not rival_b_id:
         return {"status": "error", "resultado": "N/A (IDs incompletos para H2H de rivales)"}
@@ -279,6 +266,7 @@ def get_h2h_details_selenium_streamlit_logic(driver, key_match_id, rival_a_id, r
 
 
 def extract_main_match_details_definitivo(driver, main_match_id):
+    # ... (COPIA LA FUNCIÓN COMPLETA DE TU VERSIÓN ANTERIOR) ...
     if not driver: return {"status": "error", "message": "Driver no disponible para detalles del partido."}
     url = f"{BASE_URL_ELDEFINITIVO}/match/h2h-{main_match_id}"
     try:
@@ -473,6 +461,7 @@ def extract_main_match_details_definitivo(driver, main_match_id):
         st.error(f"Error parseando detalles del partido principal {main_match_id}: {e_parse}")
         details["message"] = f"Error en parseo: {e_parse}"
     return details
+
 
 # --- STREAMLIT APP UI ---
 st.set_page_config(page_title="Análisis H2H Nowgoal Extendido", layout="wide", initial_sidebar_state="expanded")
