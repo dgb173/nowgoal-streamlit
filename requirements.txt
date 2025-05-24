@@ -1,3 +1,10 @@
 streamlit
-selenium
+requests
 beautifulsoup4
+selenium
+lxml
+# gspread # if you use it
+# gspread_dataframe # if you use it
+# psutil # if you use it
+# requests_html # if you use it
+urllib3
