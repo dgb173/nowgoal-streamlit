@@ -1,4 +1,4 @@
-# streamlit_app_super_enhanced_es.py
+# streamlit_app_final_es_v_force_complete.py
 
 import streamlit as st
 import time
@@ -22,8 +22,8 @@ from selenium.common.exceptions import TimeoutException, WebDriverException, Ses
 from selenium.webdriver.chrome.service import Service as ChromeService
 
 # --- CONFIGURACIÓN GLOBAL ---
-BASE_URL_H2H_RIVALS = "https://live18.nowgoal25.com" # Para H2H de oponentes
-BASE_URL_MAIN_MATCH_DETAILS = "https://live16.nowgoal25.com" # Para detalles del partido principal
+BASE_URL_STREAMLIT_H2H = "https://live18.nowgoal25.com"
+BASE_URL_ELDEFINITIVO = "https://live16.nowgoal25.com"
 SELENIUM_TIMEOUT_SECONDS = 20
 SELENIUM_TIMEOUT_ELDEFINITIVO = 30
 
@@ -82,12 +82,12 @@ def get_requests_session():
 # --- FUNCIONES DE REQUESTS PARA H2H DE RIVALES ---
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_soup_requests_h2h_rivals(path):
-    session = get_requests_session(); url = f"{BASE_URL_H2H_RIVALS}{path}"
+    session = get_requests_session(); url = f"{BASE_URL_STREAMLIT_H2H}{path}"
     try:
         resp = session.get(url, timeout=10); resp.raise_for_status()
         return BeautifulSoup(resp.text, "html.parser")
     except requests.RequestException as e:
-        # st.toast(f"Error de Requests (H2H Rivales) {url}: {e}", icon="🔥") # Usar toast para errores no bloqueantes
+        st.error(f"Error de Requests (H2H Rivales) {url}: {e}")
         return None
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -125,10 +125,9 @@ def get_last_away_streamlit(match_id):
     return None, None, None
 
 # --- FUNCIONES DE SELENIUM ---
-@st.cache_resource(show_spinner="Inicializando WebDriver...") 
+@st.cache_resource(show_spinner=False) 
 def get_selenium_driver_cached():
-    # (COPIA AQUÍ LA ÚLTIMA VERSIÓN DE get_selenium_driver_cached que probamos, la que forza la v120)
-    st.write("--- INICIANDO get_selenium_driver_cached ---") # Para depuración
+    st.write("--- INICIANDO get_selenium_driver_cached ---")
     options = ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
@@ -142,66 +141,75 @@ def get_selenium_driver_cached():
     options.add_experimental_option("prefs", prefs)
 
     driver = None
+    # webdriver_manager_log_path = os.path.join(os.path.expanduser("~"), ".wdm", "webdrivermanager.log") # Comentado para simplificar
+
     try:
         st.write("✅ Intentando con `webdriver-manager`...")
         from webdriver_manager.chrome import ChromeDriverManager
         
+        # Configurar logging para webdriver-manager (opcional pero puede ser útil)
+        # wdm_logger = logging.getLogger('webdriver_manager')
+        # wdm_logger.setLevel(logging.DEBUG)
+        # os.environ['WDM_LOG_LEVEL'] = 'DEBUG'
+        # os.environ['WDM_PRINT_FIRST_LINE'] = 'True'
+        # st.write(f"ℹ️ Nivel de log de WDM establecido en DEBUG (variable de entorno).")
+
         try:
             cache_path = os.path.join(os.path.expanduser("~"), ".wdm")
             if os.path.exists(cache_path):
                 st.write(f"🧹 Limpiando caché de webdriver-manager en: {cache_path}")
                 shutil.rmtree(cache_path)
+                st.write("✅ Caché de webdriver-manager limpiado.")
         except Exception as e_cache:
             st.write(f"⚠️ No se pudo limpiar caché de webdriver-manager: {e_cache}")
 
-        chrome_driver_version_to_force = "120" 
+        st.write("⏳ `ChromeDriverManager().install()` en progreso...")
+        chrome_driver_version_to_force = "120" # Forzar versión
         st.write(f"ℹ️ Intentando instalar ChromeDriver para la versión de Chrome ~{chrome_driver_version_to_force}...")
         driver_path = ChromeDriverManager(version=chrome_driver_version_to_force).install()
         
-        st.write(f"✅ `webdriver-manager` indica que ChromeDriver está en: {driver_path}")
-        if not os.path.exists(driver_path): # Verificación crucial
-            st.error(f"❌ CRÍTICO: webdriver-manager reportó una ruta ({driver_path}) pero el archivo NO EXISTE!")
-            raise FileNotFoundError(f"ChromeDriver no encontrado en {driver_path} después de la instalación de webdriver-manager")
+        st.write(f"✅ `webdriver-manager` (versión forzada ~{chrome_driver_version_to_force}) indica que ChromeDriver está en: {driver_path}")
+        st.write(f"ℹ️ Verificando existencia del archivo: {os.path.exists(driver_path)}")
 
         service = ChromeService(executable_path=driver_path)
         driver = webdriver.Chrome(service=service, options=options)
         st.success(f"✅ WebDriver inicializado exitosamente con `webdriver-manager` (versión forzada ~{chrome_driver_version_to_force}).")
         return driver
+        
     except ImportError:
-        st.error("❌ `webdriver-manager` no está instalado. Requerido. Añade 'webdriver-manager' a `requirements.txt`.")
+        st.error("❌ `webdriver-manager` no está instalado. ¡CRÍTICO! Asegúrate de que esté en `requirements.txt`.")
         return None 
-    except Exception as e_wdm: # Captura errores más genéricos de WDM aquí, incluyendo SessionNotCreatedException
-        st.error(f"❌ Error con `webdriver-manager`: {type(e_wdm).__name__}: {e_wdm}")
-        if isinstance(e_wdm, SessionNotCreatedException):
-             st.error("   Detalle específico: " + str(getattr(e_wdm, 'msg', 'No disponible')))
-        st.warning("   Intentando fallback al ChromeDriver del sistema...")
+    except SessionNotCreatedException as e_snc_wdm:
+        st.error(f"❌ ERROR DE CREACIÓN DE SESIÓN con `webdriver-manager`: {e_snc_wdm}")
+        st.error("   Stacktrace (parcial): " + str(getattr(e_snc_wdm, 'msg', 'No disponible'))) # Mostrar mensaje del error
+    except Exception as e_wdm:
+        st.error(f"❌ Error inesperado durante la inicialización con `webdriver-manager`: {type(e_wdm).__name__}: {e_wdm}")
     
-    if driver is None:
+    if driver is None: # Si webdriver-manager falló por una razón que no sea ImportError
         st.write("--- INICIANDO FALLBACK AL PATH DEL SISTEMA ---")
         try:
             st.warning("⚠️ `webdriver-manager` falló. Intentando usar ChromeDriver desde el PATH del sistema...")
             driver = webdriver.Chrome(options=options) 
-            st.success("✅ WebDriver (del PATH) inicializado. PRECAUCIÓN: La compatibilidad de versión no está garantizada.")
+            st.success("✅ WebDriver (del PATH) inicializado. PRECAUCIÓN: ESTO PODRÍA SER UNA VERSIÓN INCOMPATIBLE.")
             return driver 
-        except Exception as e_path: # Captura SessionNotCreatedException y otros
-            st.error(f"❌ Error con ChromeDriver del PATH: {type(e_path).__name__}: {e_path}")
-            if isinstance(e_path, SessionNotCreatedException):
-                 st.error("   Detalle específico: " + str(getattr(e_path, 'msg', 'No disponible')))
-                 st.error("      Este error usualmente indica incompatibilidad de versiones entre el driver del PATH y el navegador.")
-    st.error("🔴 No se pudo iniciar Selenium por ningún método. Revisa los logs.")
+        except SessionNotCreatedException as e_path_snc:
+            st.error(f"❌ ERROR DE CREACIÓN DE SESIÓN (PATH del sistema): {e_path_snc}")
+            st.error("   Stacktrace (parcial): " + str(getattr(e_path_snc, 'msg', 'No disponible')))
+            st.error("Este es el error conocido de incompatibilidad de versiones. La solución principal es hacer que `webdriver-manager` funcione.")
+        except Exception as e_path:
+            st.error(f"❌ Error inesperado con ChromeDriver del PATH: {type(e_path).__name__}: {e_path}")
+
+    st.error("🔴 No se pudo iniciar Selenium por ningún método.")
     return None
 
-
 def get_h2h_details_selenium_streamlit_logic(driver, key_match_id, rival_a_id, rival_b_id):
-    # ... (COPIA LA FUNCIÓN COMPLETA get_h2h_details_selenium_streamlit_logic de tu código anterior)
-    # ... (Asegúrate de que esta función ya tiene el formateo de hándicap con format_ah_as_decimal_string) ...
+    # ... (COPIA LA FUNCIÓN COMPLETA DE TU VERSIÓN ANTERIOR) ...
     if not driver: return {"status": "error", "resultado": "Driver no disponible"}
     if not key_match_id or not rival_a_id or not rival_b_id:
         return {"status": "error", "resultado": "N/A (IDs incompletos para H2H de rivales)"}
-    url = f"{BASE_URL_H2H_RIVALS}/match/h2h-{key_match_id}" # Corregido BASE_URL
+    url = f"{BASE_URL_STREAMLIT_H2H}/match/h2h-{key_match_id}"
     soup_selenium = None
     try:
-        # st.write(f" Accediendo (H2H Rivales): {url}")
         driver.get(url)
         WebDriverWait(driver, SELENIUM_TIMEOUT_SECONDS).until(EC.presence_of_element_located((By.ID, "table_v3")))
         time.sleep(0.75)
@@ -214,10 +222,10 @@ def get_h2h_details_selenium_streamlit_logic(driver, key_match_id, rival_a_id, r
             if not soup_selenium.find("table", id=re.compile(r"table_v\d")):
                  return {"status": "error", "resultado": "N/A (Timeout en Selenium para H2H rivales y sin datos útiles)"}
         except Exception as e_after_timeout:
-            # st.toast(f"Error HTML post-Timeout (H2H Rivales): {e_after_timeout}", icon="⚠️")
+            st.error(f"Error obteniendo HTML después de Timeout para H2H de rivales: {e_after_timeout}")
             return {"status": "error", "resultado": "N/A (Timeout en Selenium para H2H rivales)"}
     except Exception as e:
-        # st.toast(f"Error Selenium (H2H Rivales) {url}: {e}", icon="🔥")
+        st.error(f"Error durante carga/parseo de Selenium para H2H de rivales en {url}: {e}")
         return {"status": "error", "resultado": f"N/A (Error Selenium: {type(e).__name__})"}
 
     if not soup_selenium: return {"status": "error", "resultado": "N/A (Fallo al obtener soup con Selenium para H2H rivales)"}
@@ -257,30 +265,24 @@ def get_h2h_details_selenium_streamlit_logic(driver, key_match_id, rival_a_id, r
     return {"status": "not_found", "resultado": f"H2H entre rivales {rival_a_id} y {rival_b_id} no encontrado en {url}"}
 
 
-@st.cache_data(ttl=600, show_spinner="Extrayendo detalles del partido principal...", persist="disk")
-def extract_main_match_details_definitivo(driver_instance_ref, main_match_id):
-    # Nota: El driver en sí no se puede cachear con st.cache_data, pero la referencia sí.
-    # La efectividad de este cacheo dependerá de cómo Streamlit maneje el objeto driver.
-    # La verdadera carga de la página NO se cacheará aquí, solo el resultado del parseo.
-    driver = driver_instance_ref # Usar la referencia del driver
-    # ... (COPIA LA FUNCIÓN COMPLETA extract_main_match_details_definitivo de tu código anterior) ...
+def extract_main_match_details_definitivo(driver, main_match_id):
+    # ... (COPIA LA FUNCIÓN COMPLETA DE TU VERSIÓN ANTERIOR) ...
     if not driver: return {"status": "error", "message": "Driver no disponible para detalles del partido."}
-    url = f"{BASE_URL_MAIN_MATCH_DETAILS}/match/h2h-{main_match_id}" # Corregido BASE_URL
+    url = f"{BASE_URL_ELDEFINITIVO}/match/h2h-{main_match_id}"
     try:
-        # st.write(f" Accediendo (Detalles Partido): {url}")
         driver.get(url)
         WebDriverWait(driver, SELENIUM_TIMEOUT_ELDEFINITIVO).until(
              EC.any_of(EC.presence_of_element_located((By.CSS_SELECTOR, '#table_v3')),
                        EC.presence_of_element_located((By.CSS_SELECTOR, 'div.crumbs')),
                        EC.presence_of_element_located((By.CSS_SELECTOR, 'body[errorpage]'))))
-        time.sleep(1.5) # Aumentado
+        time.sleep(1)
         html = driver.page_source
         if "match not found" in html.lower() or "evento no encontrado" in html.lower() or \
            "the match is not found" in html.lower() or '<body errorpage' in html.lower():
-            return {"status": "not_found", "message": f"Partido principal {main_match_id} no encontrado en {BASE_URL_MAIN_MATCH_DETAILS}."}
+            return {"status": "not_found", "message": f"Partido principal {main_match_id} no encontrado en {BASE_URL_ELDEFINITIVO}."}
         soup = BeautifulSoup(html, 'lxml')
     except TimeoutException:
-        # st.toast(f"Timeout obteniendo detalles del partido principal {main_match_id}.", icon="⏳")
+        st.warning(f"Timeout obteniendo detalles para el partido principal {main_match_id} de {url}. Algunos datos podrían faltar.")
         try:
             html = driver.page_source
             soup = BeautifulSoup(html, 'lxml')
@@ -456,15 +458,12 @@ def extract_main_match_details_definitivo(driver_instance_ref, main_match_id):
         details["stats_v_main"] = extract_team_stats_from_summary_def(soup, 'table.team-table-guest', False)
         details["status"] = "ok"; details["message"] = "Detalles del partido principal extraídos con éxito."
     except Exception as e_parse:
-        # st.toast(f"Error parseando detalles del partido principal {main_match_id}: {e_parse}", icon="❗️")
+        st.error(f"Error parseando detalles del partido principal {main_match_id}: {e_parse}")
         details["message"] = f"Error en parseo: {e_parse}"
     return details
 
 
 # --- STREAMLIT APP UI ---
-# ... (COPIA LA UI COMPLETA DESDE st.set_page_config HASTA EL FINAL,
-#      DE TU CÓDIGO ANTERIOR) ...
-
 st.set_page_config(page_title="Análisis H2H Nowgoal Extendido", layout="wide", initial_sidebar_state="expanded")
 st.title("🎯 Analizador de Partidos Extendido - Nowgoal")
 st.markdown("""
@@ -488,31 +487,23 @@ if analizar_button:
     if not main_match_id_input:
         st.warning("⚠️ Por favor, ingresa un ID de partido válido.")
     else:
-        # Contenedor principal para los resultados, para que el spinner no oculte el título
-        results_placeholder = st.empty() 
-        
-        with st.spinner("⚙️ Preparando análisis y motor WebDriver..."):
-            if st.session_state.driver is None or not hasattr(st.session_state.driver, 'window_handles'):
-                if st.session_state.driver is not None: # Si existía pero murió
-                    try: st.session_state.driver.quit()
-                    except: pass
+        st.header(f"📊 Resultados del Análisis para Partido ID: {main_match_id_input}")
+        if st.session_state.driver is None or not hasattr(st.session_state.driver, 'window_handles'):
+            if st.session_state.driver is not None:
+                try: st.session_state.driver.quit()
+                except: pass
+            with st.spinner("Preparando el motor de análisis (Selenium)... Esto puede tardar unos momentos."):
                 st.session_state.driver = get_selenium_driver_cached()
-            
-            driver = st.session_state.driver
-
+        
+        driver = st.session_state.driver
+        
         if not driver:
-            results_placeholder.error("🔴 No se pudo iniciar Selenium. El análisis no puede continuar. Revisa los logs en la parte superior si se mostraron.")
+            st.error("🔴 No se pudo iniciar Selenium. El análisis no puede continuar. Revisa los mensajes de error en la consola o logs.")
         else:
-            # Limpiar el placeholder y mostrar el encabezado real ahora que el driver está listo (o falló)
-            results_placeholder.empty()
-            st.header(f"📊 Resultados del Análisis para Partido ID: {main_match_id_input}")
             start_time_analysis = time.time()
-            
-            # Usar st.toast para mensajes no críticos y no llenar la UI principal
-            
             # --- ANÁLISIS 1: H2H DE RIVALES ---
             st.subheader("Análisis 1: H2H de Oponentes del Equipo Local")
-            with st.spinner(f"Obteniendo Rival A y Rival B para el equipo local de {main_match_id_input}... (Usando Requests)"):
+            with st.spinner(f"Obteniendo Rival A y Rival B para el equipo local de {main_match_id_input}..."):
                 home_team_name_main, key_home_id_rival_a_context, rival_a_id, rival_a_name = get_last_home_streamlit(main_match_id_input)
                 _, rival_b_id, rival_b_name = get_last_away_streamlit(main_match_id_input)
             
@@ -530,7 +521,7 @@ if analizar_button:
             if key_home_id_rival_a_context and rival_a_id and rival_b_id:
                 if rival_a_id == rival_b_id:
                     st.info(f"ℹ️ Rival A y Rival B son el mismo equipo ({rival_a_name}). Se buscará H2H igualmente.")
-                with st.spinner(f"Buscando H2H entre {rival_a_name or 'Rival A'} y {rival_b_name or 'Rival B'} (Usando Selenium)..."):
+                with st.spinner(f"Buscando H2H entre {rival_a_name or 'Rival A'} y {rival_b_name or 'Rival B'} usando Selenium..."):
                     details_rival_h2h = get_h2h_details_selenium_streamlit_logic(driver, key_home_id_rival_a_context, rival_a_id, rival_b_id)
             elif not key_home_id_rival_a_context or not rival_a_id: st.error("❌ No se pudo determinar Rival A o su partido clave para el H2H de oponentes.")
             elif not rival_b_id: st.error("❌ No se pudo determinar Rival B para el H2H de oponentes.")
@@ -548,13 +539,13 @@ if analizar_button:
 
             # --- ANÁLISIS 2: DETALLES DEL PARTIDO PRINCIPAL ---
             st.subheader(f"Análisis 2: Detalles del Partido Principal ID {main_match_id_input}")
-            # El spinner para esta función está dentro de la propia función cacheada con st.cache_data
-            main_match_data = extract_main_match_details_definitivo(driver, main_match_id_input) # Pasamos el driver
-            
-            if main_match_data.get("status") == "ok" or (main_match_data.get("status") == "partial_data" and main_match_data.get("home_team_main") != "Local Desc."): # Si al menos tenemos nombres de equipos
+            with st.spinner(f"Extrayendo detalles completos para el partido {main_match_id_input} usando Selenium..."):
+                main_match_data = extract_main_match_details_definitivo(driver, main_match_id_input)
+
+            if main_match_data.get("status") == "ok" or main_match_data.get("status") == "partial_data":
                 st.success(f"✅ {main_match_data.get('message', 'Datos extraídos.')}")
                 m = main_match_data
-                st.markdown(f"""#### Información del Partido: **{m.get('home_team_main','N/A')}** vs **{m.get('away_team_main','N/A')}**
+                st.markdown(f"""#### Información del Partido: {m.get('home_team_main','N/A')} vs {m.get('away_team_main','N/A')}
                 **Liga:** {m.get('league_main','N/A')} | **ID:** {m.get('id','N/A')} | **Resultado Actual/Final:** `{m.get('fin_main','N/A')}`""")
                 
                 st.markdown("##### Líneas Principales del Partido")
@@ -582,14 +573,13 @@ if analizar_button:
                 
                 st.markdown("##### Estadísticas de Equipos (Total / Local o Visitante)")
                 exp_stats_l = st.expander(f"Estadísticas de {m.get('home_team_main','Local')}", expanded=False)
-                exp_stats_l.text_area(f"Stats_L_{main_match_id_input}", value=m.get('stats_l_main','N/A'), height=120,label_visibility="collapsed", disabled=True, key=f"stats_l_{main_match_id_input}") # Aumentada altura
+                exp_stats_l.text_area(f"Stats_L_{main_match_id_input}", value=m.get('stats_l_main','N/A'), height=100,label_visibility="collapsed", disabled=True, key=f"stats_l_{main_match_id_input}")
                 exp_stats_v = st.expander(f"Estadísticas de {m.get('away_team_main','Visitante')}", expanded=False)
-                exp_stats_v.text_area(f"Stats_V_{main_match_id_input}",value=m.get('stats_v_main','N/A'), height=120,label_visibility="collapsed", disabled=True, key=f"stats_v_{main_match_id_input}") # Aumentada altura
+                exp_stats_v.text_area(f"Stats_V_{main_match_id_input}",value=m.get('stats_v_main','N/A'), height=100,label_visibility="collapsed", disabled=True, key=f"stats_v_{main_match_id_input}")
 
-            elif main_match_data.get("status") == "not_found": st.error(f"❌ No se encontraron datos para el partido principal {main_match_id_input} en {BASE_URL_MAIN_MATCH_DETAILS}.")
+            elif main_match_data.get("status") == "not_found": st.error(f"❌ No se encontraron datos para el partido principal {main_match_id_input} en {BASE_URL_ELDEFINITIVO}.")
             else: st.error(f"❌ Error obteniendo detalles del partido principal: {main_match_data.get('message', 'Error desconocido')}")
-            
-            st.caption(f"⏱️ Tiempo total del análisis (incluyendo preparación del driver si fue necesario): {time.time() - start_time_analysis:.2f} segundos")
+            st.caption(f"⏱️ Tiempo total del análisis: {time.time() - start_time_analysis:.2f} segundos")
             st.markdown("---")
 else:
     st.info("✨ Ingresa un ID de partido en la barra lateral y haz clic en 'Analizar Partido' para comenzar.")
