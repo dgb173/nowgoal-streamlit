@@ -1,7 +1,7 @@
 # modules/nowgoal_scraper.py
 import streamlit as st
 import time
-import json
+import json # Aunque no se usa directamente en este módulo, a veces es útil para depuración.
 import re
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -15,8 +15,11 @@ import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import random
+from typing import Mapping, Any # Necesario para la anotación de tipo
+
 
 # --- CONFIGURACIÓN ESPECÍFICA DEL SCRAPER (VALORES POR DEFECTO) ---
+# Estos pueden ser sobrescritos por la UI en app.py
 DEFAULT_MAX_WORKERS_SCRAPER = 2
 DEFAULT_SELENIUM_TIMEOUT_SCRAPER = 90
 DEFAULT_BATCH_SIZE_SCRAPER = 50
@@ -26,9 +29,11 @@ WORKER_START_DELAY = random.uniform(0.3, 0.8)
 INTER_ID_SUBMIT_DELAY = 0.05
 RETRY_DELAY_GSPREAD = 15
 API_PAUSE_GSPREAD = 0.5
-NOMBRE_SHEET = "Datos" # Usado en get_gsheets_client_and_sheet
-NOMBRE_HOJA_NEG_CERO = "Visitantes"
-NOMBRE_HOJA_POSITIVOS = "Locales"
+NOMBRE_SHEET = "Datos" # Nombre del archivo de Google Sheet (Ej. "MiLibroDeFutbol")
+NOMBRE_HOJA_NEG_CERO = "Visitantes" # Nombre de la hoja para AH_Act <= 0 (Ej. "VisitantesAHNeg")
+NOMBRE_HOJA_POSITIVOS = "Locales" # Nombre de la hoja para AH_Act > 0 (Ej. "LocalesAHPos")
+
+# Columnas para la salida de Google Sheets (¡incluye "H2H_Opponents"!)
 OUTPUT_COLUMNS = [
     "AH_H2H_V", "AH_Act", "Res_H2H_V", "AH_L_H", "Res_L_H",
     "AH_V_A", "Res_V_A", "AH_H2H_G", "Res_H2H_G",
@@ -39,34 +44,31 @@ OUTPUT_COLUMNS = [
 
 # --- FUNCIONES DEL SCRAPER ---
 
-# modules/nowgoal_scraper.py
-# ... (todos los demás imports y constantes como estaban) ...
-
-@st.cache_resource(ttl=3600) # Asegúrate de que esto esté activo
-@st.cache_resource(ttl=3600)
-def get_gsheets_client_and_sheet(credentials_data): # <--- CAMBIO AQUÍ (sin anotación de tipo)
+@st.cache_resource(ttl=3600) # Cachea el cliente y la hoja de gspread por 1 hora
+def get_gsheets_client_and_sheet(_credentials_data: Mapping[str, Any]): # ¡Importante! El guion bajo para no hashear
     """
-    Intenta conectar a Google Sheets.
-    El argumento 'credentials_data' es el objeto de st.secrets.
+    Intenta conectar a Google Sheets usando el diccionario de credenciales.
+    El argumento '_credentials_data' (con guion bajo) es el AttrDict de st.secrets.
+    Streamlit NO intentará hashear este argumento para el cacheo.
     Retorna (gspread.Client, gspread.Spreadsheet) o (None, None).
     """
-    # Convertir el objeto de Streamlit Secrets a un dict estándar
-    actual_credentials_dict = dict(credentials_data)
-    
-    # ... (resto de la función igual) ...
+    # Convertir el AttrDict de Streamlit a un dict estándar de Python, que gspread espera
+    actual_credentials_dict = dict(_credentials_data)
+
     retries = 3
     for attempt in range(retries):
         try:
             gc = gspread.service_account_from_dict(actual_credentials_dict)
-            sh = gc.open(NOMBRE_SHEET)
+            sh = gc.open(NOMBRE_SHEET) # Usa la constante NOMBRE_SHEET
             return gc, sh
         except Exception as e:
+            # Puedes usar print aquí para que aparezca en los logs del servidor de Streamlit Cloud
+            # print(f"DEBUG_GSheets_Connect: Error al conectar (Intento {attempt + 1}/{retries}): {e}")
             if attempt < retries - 1:
-                time.sleep(RETRY_DELAY_GSPREAD)
+                time.sleep(RETRY_DELAY_GSPREAD) # Usa la constante RETRY_DELAY_GSPREAD
             else:
-                return None, None
-
-# ... (el resto del archivo modules/nowgoal_scraper.py permanece igual) ...
+                # print("DEBUG_GSheets_Connect: Fallo crítico después de todos los reintentos.")
+                return None, None # Devolver None si falla después de todos los reintentos
 
 def parse_ah_to_number(ah_line_str: str):
     if not isinstance(ah_line_str, str) or not ah_line_str.strip() or ah_line_str.strip() in ['-', '?', '']:
@@ -360,8 +362,6 @@ def extract_match_worker(driver_instance, mid, selenium_timeout_val, home_name_c
             for row_h2h_opp in h2h_history_rows: # Buscar en la tabla H2H general
                 d_h2h_opp = get_match_details_from_row(row_h2h_opp, 'fscore_3')
                 if not d_h2h_opp: continue
-                # Opcional: filtrar por liga si se desea que el H2H de oponentes sea de la misma liga
-                # if current_league_id and d_h2h_opp.get('league_id_hist') and d_h2h_opp.get('league_id_hist') != current_league_id: continue
                 
                 ah_val = d_h2h_opp.get('ahLine', '-')
                 formatted_ah = ah_val if ah_val != '0.0' else '0' # Evitar "X/-0.0"
@@ -389,7 +389,6 @@ def extract_match_worker(driver_instance, mid, selenium_timeout_val, home_name_c
                                f"🛫V:{guest_stats_sum['loc_aw_matches']}|{guest_stats_sum['loc_aw_w']}/{guest_stats_sum['loc_aw_d']}/{guest_stats_sum['loc_aw_l']}|{guest_stats_sum['loc_aw_gf']}-{guest_stats_sum['loc_aw_ga']}")
     
     except Exception as main_extract_e:
-        # Este error es si algo dentro del gran bloque try falla
         return mid, 'parse_error', (url, f"Detailed parse error in MID {mid}: {type(main_extract_e).__name__} - {str(main_extract_e)[:200]}")
     
     final_row_data = [ah1, ah_curr_str, res3, ah4, res4, ah5, res5, ah6, res6, comp7, comp8,
@@ -400,7 +399,7 @@ def extract_match_worker(driver_instance, mid, selenium_timeout_val, home_name_c
         val_str = str(v_format_item) if v_format_item is not None else '-'
         if re.fullmatch(r"^-?\d+(\.\d+)?$", val_str.strip()) and val_str not in ['-', '?', '?*?', 'N/A']:
             final_display_str_para_sheets = val_str.replace('.', ',')
-            formatted_final_row.append("'" + final_display_str_para_sheets) # Forzar texto en Sheets
+            formatted_final_row.append("'" + final_display_str_para_sheets)
         else: formatted_final_row.append(val_str)
     
     if ah_curr_str == '?': # Si el AH actual no se pudo determinar, se salta
@@ -412,8 +411,6 @@ def worker_task(mid_param, selenium_timeout_val, home_name_cache='N/A', away_nam
     driver = None
     try:
         opts = get_chrome_options()
-        # En Streamlit Cloud, Chromedriver debería estar disponible por packages.txt
-        # Para local, asegurar que chromedriver esté en PATH o usar webdriver_manager
         driver = webdriver.Chrome(options=opts)
         result = extract_match_worker(driver, mid_param, selenium_timeout_val, home_name_cache, away_name_cache)
         return result
@@ -465,8 +462,6 @@ def upload_data_to_sheet(worksheet_name: str, data_rows: list, columns_list: lis
                     start_row_for_data = current_rows_with_content + 1
                 elif current_rows_with_content > 0 and not header_exists:
                     start_row_for_data = current_rows_with_content + 1
-                # Si start_row_for_data es 2, es porque la hoja estaba vacía y se escribió encabezado.
-                # Si es 1 y no hay contenido, también está bien, se escribirá desde A1 (ya cubierto por bloque de hoja vacía)
 
             except gspread.exceptions.WorksheetNotFound:
                 status_upload.warning(f"Hoja '{worksheet_name}' no encontrada. Creando...");
@@ -492,7 +487,7 @@ def upload_data_to_sheet(worksheet_name: str, data_rows: list, columns_list: lis
             for i_batch in range(num_batches):
                 batch_start_index = i_batch * batch_size
                 batch_end_index = min((i_batch + 1) * batch_size, len(df))
-                batch_df_slice = df.iloc[batch_start_index:batch_end_index] # Renombrado para evitar confusión con df global
+                batch_df_slice = df.iloc[batch_start_index:batch_end_index]
                 values_to_upload = batch_df_slice.values.tolist()
 
                 current_gspread_start_row = start_row_for_data + batch_start_index
@@ -510,13 +505,13 @@ def upload_data_to_sheet(worksheet_name: str, data_rows: list, columns_list: lis
                     status_upload.warning(f" ⚠️ Error API Lote {i_batch+1} ({api_e.response.status_code})...Reintentando...")
                     upload_successful_sheet = False
                     if api_e.response.status_code == 429: # Rate limit
-                        wait_time = retry_delay_gs * (1 + random.uniform(0.2, 0.6)) # Aumentar un poco el jitter
+                        wait_time = retry_delay_gs * (1 + random.uniform(0.2, 0.6))
                         status_upload.warning(f"Límite API. Durmiendo {wait_time:.1f}s y reintentando Lote {i_batch+1}...")
                         time.sleep(wait_time)
                         try:
                             ws.update(full_range_to_update, values_to_upload, value_input_option='USER_ENTERED')
                             status_upload.write(f"    Reintento Lote {i_batch+1} OK.")
-                            upload_successful_sheet = True; time.sleep(api_pause + 0.5) # Pausa extra post-reintento
+                            upload_successful_sheet = True; time.sleep(api_pause + 0.5)
                         except Exception as retry_e:
                             status_upload.error(f"    ❌ Reintento Lote {i_batch+1} fallido: {retry_e}")
                             upload_successful_sheet = False; break 
@@ -535,12 +530,11 @@ def upload_data_to_sheet(worksheet_name: str, data_rows: list, columns_list: lis
             status_upload.update(label=f"❌ Error fatal en subida para '{worksheet_name}': {e_outer}", state="error")
             upload_successful_sheet = False
 
-        # Actualizar estado final del st.status
         if upload_successful_sheet and not df.empty :
             status_upload.update(label=f"✅ Subida a '{worksheet_name}' completada ({len(df)} filas).", state="complete")
         elif not upload_successful_sheet and not df.empty:
             status_upload.update(label=f"❌ Subida a '{worksheet_name}' con errores o incompleta.", state="error")
-        elif df.empty: # Ya manejado arriba, pero por si acaso
+        elif df.empty:
             status_upload.update(label=f"✅ Nada que subir a '{worksheet_name}'.", state="complete")
         
         return upload_successful_sheet
@@ -553,7 +547,6 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
     st.subheader(f"🚀 Iniciando Extracción con {max_workers} Workers Concurrentes")
     global_start_time = time.time()
     
-    # Calcular el total de IDs para la barra de progreso general
     total_ids_all_ranges = 0
     for r in extraction_ranges:
         if isinstance(r.get('start_id'), int) and isinstance(r.get('end_id'), int) and r['start_id'] >= r['end_id']:
@@ -576,22 +569,21 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
         rows_neg_zero_range, rows_pos_range = [], []; ids_to_process = list(range(start_id, end_id - 1, -1))
         total_ids_in_range = len(ids_to_process); processed_count_range = 0; current_successful_range = 0
         
-        # Usar st.expander o st.status para agrupar los logs del rango
         with st.status(f"Procesando Rango '{label}'... ({total_ids_in_range} IDs)", expanded=True) as range_status_ui:
             range_progress_bar_in_status = range_status_ui.progress(0)
             
             futures = {}; counter_lock = threading.Lock()
             with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix='SeleniumWorker') as executor:
                 for i, mid_exec in enumerate(ids_to_process):
-                    future = executor.submit(worker_task, mid_exec, selenium_timeout) # No pasar caches aquí
-                    futures[future] = mid_exec; time.sleep(INTER_ID_SUBMIT_DELAY) # Pequeña pausa entre envíos
+                    future = executor.submit(worker_task, mid_exec, selenium_timeout)
+                    futures[future] = mid_exec; time.sleep(INTER_ID_SUBMIT_DELAY)
                 
                 for future_item in as_completed(futures):
                     processed_count_range += 1; processed_ids_overall_count +=1
                     mid_completed = futures[future_item]
                     try:
                         f_mid, status, result_data = future_item.result()
-                        with counter_lock: # Proteger contadores globales
+                        with counter_lock:
                             if status == 'ok':
                                 count_ok += 1; current_successful_range += 1
                                 row_data, ah_act_n = result_data
@@ -600,15 +592,12 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
                             elif status == 'skipped': count_skipped += 1
                             elif status == 'not_found': count_not_found += 1; failed_mids['not_found'].append(f_mid)
                             elif status == 'load_error':
-                                count_load_error += 1; failed_mids['load'].append(f_mid)
-                                range_status_ui.warning(f"MID {f_mid} Load Error: {result_data[1] if isinstance(result_data, tuple) else result_data}")
+                                count_load_error += 1; failed_mids['load'].append(f_mid); range_status_ui.warning(f"MID {f_mid} Load Error: {result_data[1] if isinstance(result_data, tuple) else result_data}")
                             elif status == 'parse_error':
-                                count_parse_error += 1; failed_mids['parse'].append(f_mid)
-                                range_status_ui.warning(f"MID {f_mid} Parse Error: {result_data[1] if isinstance(result_data, tuple) else result_data}")
+                                count_parse_error += 1; failed_mids['parse'].append(f_mid); range_status_ui.warning(f"MID {f_mid} Parse Error: {result_data[1] if isinstance(result_data, tuple) else result_data}")
                         
                         percentage_range = processed_count_range / total_ids_in_range if total_ids_in_range > 0 else 0
                         range_progress_bar_in_status.progress(int(percentage_range * 100))
-                        # Actualizar texto del st.status (label)
                         range_status_ui.update(label=f"Rango '{label}': {processed_count_range}/{total_ids_in_range} (OK: {current_successful_range})")
 
                         if total_ids_all_ranges > 0:
@@ -616,7 +605,7 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
                             overall_progress_bar_slot.progress(overall_percentage)
                             overall_progress_text_slot.text(f"Progreso General: {processed_ids_overall_count}/{total_ids_all_ranges} IDs ({overall_percentage:.1%})")
 
-                    except Exception as exc_future: # Error en el futuro mismo
+                    except Exception as exc_future:
                          with counter_lock: count_load_error += 1; failed_mids['load'].append(mid_completed)
                          range_status_ui.error(f'‼️ Error crítico en Hilo para MID {mid_completed}: {exc_future}')
             
@@ -624,8 +613,8 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
         
         st.caption(f"Resultados OK para Rango '{label}': {len(rows_neg_zero_range)} (AH ≤ 0), {len(rows_pos_range)} (AH > 0)")
         
-        upload_neg_progress_slot = st.empty() # Placeholder para la barra de progreso de subida
-        upload_pos_progress_slot = st.empty() # Placeholder para la barra de progreso de subida
+        upload_neg_progress_slot = st.empty()
+        upload_pos_progress_slot = st.empty()
 
         succ_neg = upload_data_to_sheet(NOMBRE_HOJA_NEG_CERO, rows_neg_zero_range, OUTPUT_COLUMNS, gsheet_sh_handle, batch_size, API_PAUSE_GSPREAD, RETRY_DELAY_GSPREAD, upload_neg_progress_slot)
         succ_pos = upload_data_to_sheet(NOMBRE_HOJA_POSITIVOS, rows_pos_range, OUTPUT_COLUMNS, gsheet_sh_handle, batch_size, API_PAUSE_GSPREAD, RETRY_DELAY_GSPREAD, upload_pos_progress_slot)
@@ -634,7 +623,7 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
         if range_idx < len(extraction_ranges) - 1:
             st.info(f"⏳ Pausando 5 segundos antes del siguiente rango..."); time.sleep(5)
 
-    overall_progress_bar_slot.empty(); overall_progress_text_slot.empty() # Limpiar al final
+    overall_progress_bar_slot.empty(); overall_progress_text_slot.empty()
     
     st.markdown(f"\n{'='*60}\n### ✨ Proceso de Extracción Finalizado ✨\n{'='*60}")
     global_end_time = time.time(); total_duration = global_end_time - global_start_time
@@ -656,12 +645,12 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
             for err_type, id_list in failed_mids.items():
                 if id_list:
                     st.write(f"  - **{err_type.replace('_',' ').capitalize()} ({len(id_list)} IDs):**")
-                    st.json(id_list[:20]) # Mostrar solo los primeros 20 para no saturar
+                    st.json(id_list[:20])
                     if len(id_list) > 20: st.caption("    ... y más.")
     
     st.markdown("---"); st.subheader("📈 Estado de la Subida a Google Sheets por Rango:");
     overall_up_success = True
-    for lbl, stat_info in ranges_upload_success.items(): # Renombrado 'stat' a 'stat_info'
+    for lbl, stat_info in ranges_upload_success.items():
         if stat_info.get('skipped_config', False):
             st.warning(f"  - Rango '{lbl}': ⚠️ Saltado por mala configuración de ID."); overall_up_success = False
         else:
@@ -669,7 +658,7 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
             if neg_ok_val and pos_ok_val: stat_str = "✅ OK (Ambas Hojas)"
             elif neg_ok_val and not pos_ok_val: stat_str = "⚠️ Fallo Hoja Positivos"; overall_up_success = False
             elif not neg_ok_val and pos_ok_val: stat_str = "⚠️ Fallo Hoja Visitantes (Neg/Cero)"; overall_up_success = False
-            else: stat_str = "❌ Fallo Ambas Hojas"; overall_up_success = False # Si ambas son False o una es False y la otra no existe
+            else: stat_str = "❌ Fallo Ambas Hojas"; overall_up_success = False
             st.markdown(f"  - Rango '{lbl}': **[{stat_str}]**")
             
     st.markdown(f"\n{'='*60}")
@@ -682,7 +671,7 @@ def run_nowgoal_scraper(gsheet_sh_handle: gspread.Spreadsheet, extraction_ranges
     st.caption("Fin del resumen del proceso.")
 
 # --- INTERFAZ DE USUARIO PARA EL SCRAPER DE NOWGOAL (LLAMADA DESDE APP.PY) ---
-def display_nowgoal_scraper_ui(gsheet_sh_handle: gspread.Spreadsheet): # Recibe el handle de la hoja
+def display_nowgoal_scraper_ui(gsheet_sh_handle: gspread.Spreadsheet):
     st.header("1️⃣ Extractor de Datos de Partidos (Nowgoal)")
     st.markdown("""
     Introduce los rangos de IDs de partidos que deseas extraer.
@@ -704,7 +693,6 @@ def display_nowgoal_scraper_ui(gsheet_sh_handle: gspread.Spreadsheet): # Recibe 
         help="Un rango por línea: start_id,end_id,EtiquetaDelRango"
     )
 
-    # Mover sliders de configuración a una sección expandible para limpiar la UI principal
     with st.expander("⚙️ Ajustes Avanzados de Extracción", expanded=False):
         max_workers_slider = st.slider(
             "Número de Workers Selenium (hilos concurrentes)", 1, 8, DEFAULT_MAX_WORKERS_SCRAPER,
@@ -714,7 +702,7 @@ def display_nowgoal_scraper_ui(gsheet_sh_handle: gspread.Spreadsheet): # Recibe 
         batch_size_slider = st.number_input(
             "Tamaño del Lote de Subida a Google Sheets", min_value=10, max_value=500, value=DEFAULT_BATCH_SIZE_SCRAPER, step=10,
             key="nowgoal_batchsize_input",
-            help="Cantidad de filas a subir a Google Sheets en cada operación de la API para evitar timeouts."
+            help="Cantidad de filas a subir a Google Sheets en cada operación de la API."
         )
         selenium_timeout_slider = st.number_input(
             "Timeout de Selenium (segundos)", min_value=30, max_value=300, value=DEFAULT_SELENIUM_TIMEOUT_SCRAPER, step=10,
@@ -730,7 +718,7 @@ def display_nowgoal_scraper_ui(gsheet_sh_handle: gspread.Spreadsheet): # Recibe 
         parsed_ranges = []
         has_errors_in_ranges = False
         for line_num, line in enumerate(id_ranges_input.strip().split('\n')):
-            if not line.strip(): continue # Ignorar líneas completamente vacías
+            if not line.strip(): continue
             parts = [p.strip() for p in line.split(',')]
             if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
                 try:
@@ -741,7 +729,7 @@ def display_nowgoal_scraper_ui(gsheet_sh_handle: gspread.Spreadsheet): # Recibe 
                     parsed_ranges.append({
                         'start_id': start_id_val, 'end_id': end_id_val, 'label': parts[2]
                     })
-                except ValueError: # Debería ser cubierto por isdigit pero por si acaso
+                except ValueError:
                     st.error(f"Error en Rango línea {line_num+1}: Los IDs deben ser números enteros. Línea: '{line}'")
                     has_errors_in_ranges = True
             else:
@@ -755,12 +743,11 @@ def display_nowgoal_scraper_ui(gsheet_sh_handle: gspread.Spreadsheet): # Recibe 
             st.warning("⚠️ No se encontraron rangos de IDs válidos para procesar después de la validación.")
             return
 
-        if not gsheet_sh_handle: # Doble chequeo, aunque app.py debería haberlo manejado
+        if not gsheet_sh_handle:
             st.error("❌ Conexión a Google Sheets no disponible. No se puede iniciar el scraping.")
             return
 
         st.info(f"🎉 ¡Iniciando proceso de extracción para {len(parsed_ranges)} rango(s)!")
-        # Llamar a la función principal del scraper
         run_nowgoal_scraper(
             gsheet_sh_handle,
             parsed_ranges,
