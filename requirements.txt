@@ -1,12 +1,7 @@
 streamlit
-requests
-beautifulsoup4
 selenium
+gspread
+# gspread_dataframe # Parece que no lo usas directamente, si es así, puedes quitarlo. Si alguna función lo usa, mantenlo.
+beautifulsoup4
 lxml
-gspread # if you use it
-gspread_dataframe # if you use it
-psutil # if you use it
-requests_html # if you use it
-urllib3
-webdriver-manager
-
+# chromedriver-py # Opcional, considerar si es necesario para el entorno de despliegue.
