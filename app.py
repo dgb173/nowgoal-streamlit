@@ -1,7 +1,3 @@
-# app**
-*(Este archivo debería estar correcto, pero lo incluyo por completitud)*
-
-```python
 # app.py.py
 import streamlit as st
 from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
