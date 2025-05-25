@@ -43,33 +43,27 @@ OUTPUT_COLUMNS = [
 # ... (todos los demás imports y constantes como estaban) ...
 
 @st.cache_resource(ttl=3600) # Asegúrate de que esto esté activo
-def get_gsheets_client_and_sheet(credentials_dict_from_streamlit: st.secrets.AttrDict): # El tipo puede ser más específico
+@st.cache_resource(ttl=3600)
+def get_gsheets_client_and_sheet(credentials_data): # <--- CAMBIO AQUÍ (sin anotación de tipo)
     """
     Intenta conectar a Google Sheets.
-    El argumento 'credentials_dict_from_streamlit' es el AttrDict de st.secrets.
+    El argumento 'credentials_data' es el objeto de st.secrets.
     Retorna (gspread.Client, gspread.Spreadsheet) o (None, None).
     """
-    # print(f"DEBUG: Tipo de credenciales recibidas: {type(credentials_dict_from_streamlit)}")
-
-    # --- CAMBIO IMPORTANTE AQUÍ ---
-    # Convertir el AttrDict de Streamlit a un dict estándar para gspread
-    actual_credentials_dict = dict(credentials_dict_from_streamlit)
-    # print(f"DEBUG: Tipo de credenciales después de convertir a dict: {type(actual_credentials_dict)}")
-
+    # Convertir el objeto de Streamlit Secrets a un dict estándar
+    actual_credentials_dict = dict(credentials_data)
+    
+    # ... (resto de la función igual) ...
     retries = 3
     for attempt in range(retries):
         try:
-            # Usar el diccionario convertido
             gc = gspread.service_account_from_dict(actual_credentials_dict)
-            sh = gc.open(NOMBRE_SHEET) # NOMBRE_SHEET definido a nivel de módulo
-            # print(f"DEBUG: Conexión a GSheets exitosa para la hoja '{NOMBRE_SHEET}'")
+            sh = gc.open(NOMBRE_SHEET)
             return gc, sh
         except Exception as e:
-            # print(f"DEBUG: Error conectando a GSheets (Intento {attempt + 1}/{retries}): {e}")
             if attempt < retries - 1:
-                time.sleep(RETRY_DELAY_GSPREAD) # RETRY_DELAY_GSPREAD definido a nivel de módulo
+                time.sleep(RETRY_DELAY_GSPREAD)
             else:
-                # print("DEBUG: Fallo crítico al conectar a GSheets después de todos los reintentos.")
                 return None, None
 
 # ... (el resto del archivo modules/nowgoal_scraper.py permanece igual) ...
