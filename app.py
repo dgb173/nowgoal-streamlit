@@ -20,7 +20,7 @@ from modules.other_feature import display_other_feature_ui # Asumiendo que tiene
 
 def main():
     st.set_page_config(
-        page_title="Nowgoal Data Scraperstate="expanded"
+        page_title="Nowgoal Data Scraperstate"="expanded"
     )
 
     st.title("⚽📊 App de Análisis de Datos y Herramientas & Tools",
