@@ -39,7 +39,7 @@ OUTPUT_COLUMNS = [
 
 # --- FUNCIONES DEL SCRAPER ---
 
-@st.cache_resource(ttl=3600) # Cache por 1 hora
+# @st.cache_resource(ttl=3600) # Cache por 1 hora
 def get_gsheets_client_and_sheet(credentials_dict: dict):
     """
     Intenta conectar a Google Sheets usando el diccionario de credenciales.
