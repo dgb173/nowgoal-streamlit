@@ -1,92 +1,105 @@
-# app.py (Prueba de Conexión a GSheets con Cacheo)
+# app.py (Archivo principal de Streamlit)
 import streamlit as st
-# Asegúrate de que la carpeta 'modules' y 'modules/__init__.py' (vacío) existan
-# y que 'nowgoal_scraper.py' esté dentro de 'modules'.
-from modules.nowgoal_scraper import get_gsheets_client_and_sheet # Importa la función
+# Asegúrate de que los módulos estén en una carpeta 'modules' y que haya un __init__.py vacío en ella
+from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
+from modules.other_feature import display_other_feature_ui
 
-st.set_page_config(
-    page_title="Test Conexión GSheets",
-    page_icon="🔗",
-    layout="wide" # Opcional, para usar más ancho de pantalla
-)
+def main():
+    st.set_page_config(
+        page_title="Nowgoal Data Scraper & Tools",
+        page_icon="⚽",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
 
-st.title("🔗 Prueba de Conexión a Google Sheets (con Cacheo)")
-st.write("Esta prueba intentará conectar a Google Sheets usando la función `get_gsheets_client_and_sheet` del módulo `nowgoal_scraper`.")
-st.write("La función `get_gsheets_client_and_sheet` debería tener el decorador `@st.cache_resource` activo para esta prueba.")
-st.markdown("---")
+    st.title("⚽📊 App de Análisis de Datos y Herramientas 📊⚽")
+    st.markdown("""
+    Bienvenido a la aplicación central. Usa el menú lateral para navegar entre las diferentes herramientas disponibles.
+    """)
 
-gsheets_credentials = None
-gsheets_sh_handle = None # Para el handle de la hoja de cálculo
+    # Menú lateral para las opciones
+    st.sidebar.header("🛠️ Herramientas Disponibles")
+    selected_tool = st.sidebar.radio(
+        "Selecciona una herramienta:",
+        ("1. Extractor de Datos de Nowgoal", "2. Otra Funcionalidad (Beta)", "3. Información General"),
+        key="main_tool_selection"
+    )
 
-# 1. Intentar cargar las credenciales desde st.secrets
-st.subheader("Paso 1: Cargar Credenciales desde st.secrets")
-try:
-    if "gcp_service_account" in st.secrets:
-        gsheets_credentials = st.secrets["gcp_service_account"]
-        st.success("✅ Credenciales encontradas en `st.secrets['gcp_service_account']`.")
+    # --- Gestión de Credenciales de Google Sheets (Centralizada) ---
+    gsheets_credentials = None
+    gsheets_sh_handle = None # Variable para almacenar el handle de la hoja
 
-        # --- INICIO SECCIÓN DE DEBUG TEMPORAL (Opcional, pero útil) ---
-        with st.expander("Detalles de las credenciales cargadas (Parcial)", expanded=False):
-            if isinstance(gsheets_credentials, dict):
-                st.write("Tipo de `gsheets_credentials`: Diccionario (¡Correcto!)")
-                st.json({
-                    "project_id": gsheets_credentials.get('project_id', 'NO ENCONTRADO'),
-                    "client_email": gsheets_credentials.get('client_email', 'NO ENCONTRADO'),
-                    "private_key_presente": "-----BEGIN PRIVATE KEY-----" in gsheets_credentials.get('private_key', '') if gsheets_credentials.get('private_key') else False
-                })
+    # Intentar cargar las credenciales solo si es necesario para la primera opción
+    if selected_tool == "1. Extractor de Datos de Nowgoal":
+        try:
+            if "gcp_service_account" in st.secrets:
+                gsheets_credentials = st.secrets["gcp_service_account"]
+                with st.spinner("⚙️ Estableciendo conexión con Google Sheets..."):
+                    # La función get_gsheets_client_and_sheet está en nowgoal_scraper
+                    # Devuelve (gc_client, sheet_handle) o (None, None)
+                    gc_client, gsheets_sh_handle_temp = get_gsheets_client_and_sheet(gsheets_credentials)
+
+                if not gsheets_sh_handle_temp:
+                    st.sidebar.error("❌ Error conectando a GSheets. Verifica secretos y conexión a internet de la app.")
+                    st.error("No se pudo conectar a Google Sheets. El extractor no funcionará.")
+                else:
+                    st.sidebar.success("🔗 Conexión a Google Sheets establecida.")
+                    gsheets_sh_handle = gsheets_sh_handle_temp # Asignar al handle que se usará
             else:
-                st.error(f"Tipo de `gsheets_credentials` NO es Diccionario. Es: {type(gsheets_credentials)}")
-                st.text("Contenido (truncado): " + str(gsheets_credentials)[:200] + "...")
-        # --- FIN SECCIÓN DE DEBUG TEMPORAL ---
+                st.sidebar.error("❗️ `gcp_service_account` NO encontrado en `st.secrets` de Streamlit Cloud.")
+                st.error("Error de Configuración: Faltan las credenciales de Google Sheets. El extractor no funcionará.")
 
-    else:
-        st.error("❗️ `gcp_service_account` NO encontrado en `st.secrets`.")
-        st.warning("La aplicación no podrá conectar a Google Sheets sin estas credenciales. "
-                   "Asegúrate de haber configurado los secretos correctamente en Streamlit Cloud.")
-        st.stop() # Detener si no hay credenciales, ya que el propósito es probar la conexión
+        except Exception as e:
+            st.sidebar.error(f"🆘 Error al procesar credenciales: {str(e)[:100]}...")
+            st.error(f"Un error ocurrió con las credenciales: {e}. El extractor no funcionará.")
 
-except Exception as e:
-    st.error(f"🆘 Error catastrófico al intentar acceder a `st.secrets`: {e}")
-    st.info("Esto podría indicar un problema con la plataforma Streamlit o una configuración de secretos muy dañada.")
-    st.stop()
 
-st.markdown("---")
-
-# 2. Intentar conectar usando la función (cacheada)
-st.subheader("Paso 2: Conectar usando `get_gsheets_client_and_sheet`")
-if gsheets_credentials:
-    st.write("Intentando llamar a `get_gsheets_client_and_sheet(credentials_dict)`...")
-    try:
-        # Esta es la llamada crítica que podría estar fallando con tokenize.TokenError
-        # o con otros errores si las credenciales son válidas pero los permisos/API no.
-        with st.spinner("⚙️ Conectando a Google Sheets... (Esto puede tardar si es la primera vez o el cache ha expirado)"):
-            gc_client, gsheets_sh_handle_temp = get_gsheets_client_and_sheet(gsheets_credentials)
-
-        if gsheets_sh_handle_temp and gc_client: # Comprobar ambos
-            gsheets_sh_handle = gsheets_sh_handle_temp
-            st.success("✅ ¡Conexión a Google Sheets exitosa!")
-            st.info(f"Nombre de la Hoja de Cálculo (Spreadsheet) abierta: **{gsheets_sh_handle.title}**")
-            try:
-                worksheets = gsheets_sh_handle.worksheets()
-                st.write(f"Hojas (Worksheets) encontradas en el archivo: `{[ws.title for ws in worksheets]}`")
-            except Exception as e_ws:
-                st.warning(f"Se conectó al archivo, pero no se pudieron listar las hojas: {e_ws}")
+    # --- Enrutamiento a la Herramienta Seleccionada ---
+    if selected_tool == "1. Extractor de Datos de Nowgoal":
+        if gsheets_sh_handle: # Solo mostrar la UI si la conexión a GSheets fue exitosa
+            display_nowgoal_scraper_ui(gsheets_sh_handle) # Pasar el handle de la hoja
         else:
-            st.error("❌ Falló la conexión a Google Sheets (la función `get_gsheets_client_and_sheet` devolvió None).")
-            st.info("Posibles causas: Credenciales incorrectas (aunque encontradas), "
-                    "cuenta de servicio sin permisos para la API de Sheets/Drive o para acceder al archivo, "
-                    "nombre de la hoja de cálculo incorrecto en `NOMBRE_SHEET` dentro de `nowgoal_scraper.py`.")
-            st.info("Revisa los logs de la aplicación en Streamlit Cloud ('Manage app' -> 'Logs') para más detalles si el error no es obvio aquí.")
+            st.warning("⚠️ La conexión a Google Sheets es necesaria para esta herramienta y no se pudo establecer o no se han configurado los secretos.")
+            st.info("Por favor, asegúrate de que las credenciales `gcp_service_account` estén correctamente configuradas en los secretos de tu aplicación en Streamlit Cloud.")
 
-    except Exception as e:
-        st.error(f"💥 Ocurrió una excepción al llamar a `get_gsheets_client_and_sheet`: {type(e).__name__}")
-        st.error(f"Mensaje: {e}")
-        st.error("Este podría ser el `tokenize.TokenError` si el problema persiste con el mecanismo de cacheo. "
-                 "También podría ser un error de `gspread` si las credenciales son inválidas o hay problemas de permisos.")
-        st.info("Revisa los logs de la aplicación en Streamlit Cloud ('Manage app' -> 'Logs') para el traceback completo.")
+    elif selected_tool == "2. Otra Funcionalidad (Beta)":
+        display_other_feature_ui()
 
-else:
-    st.warning("No se intentó la conexión porque las credenciales no se cargaron correctamente en el Paso 1.")
+    elif selected_tool == "3. Información General":
+        st.header("ℹ️ Información General de la Aplicación")
+        st.markdown("""
+        ---
+        ### 📚 Descripción
+        Esta es una aplicación multi-herramienta que incluye:
+        1.  Un potente **Extractor de Datos de Nowgoal** para análisis de partidos de fútbol.
+        2.  Espacio para futuras funcionalidades.
 
-st.markdown("---")
-st.info("Fin de la prueba de conexión.")
+        ### 🔐 Configuración de Credenciales (Google Sheets)
+        Para que el **Extractor de Datos de Nowgoal** pueda escribir en tus Google Sheets, necesita credenciales de servicio.
+        Configura los secretos en Streamlit Cloud (Sección "Secrets" de tu app) o en tu archivo local `.streamlit/secrets.toml` bajo la clave `gcp_service_account`.
+
+        El contenido del secreto debe ser el JSON completo de tus credenciales de servicio de Google. Streamlit lo parseará.
+        Ejemplo simplificado de cómo se vería la entrada en la UI de Secretos de Streamlit Cloud:
+        ```toml
+        # Esta es la clave principal que tu código usa (st.secrets["gcp_service_account"])
+        [gcp_service_account]
+        type = "service_account"
+        project_id = "tu-proyecto-gcp"
+        private_key_id = "tu_private_key_id"
+        private_key = "-----BEGIN PRIVATE KEY-----\\nMUYIMPORTANTE...\\n-----END PRIVATE KEY-----\\n"
+        client_email = "tu-email-de-servicio@tu-proyecto-gcp.iam.gserviceaccount.com"
+        client_id = "..."
+        auth_uri = "https://accounts.google.com/o/oauth2/auth"
+        token_uri = "https://oauth2.googleapis.com/token"
+        auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+        client_x509_cert_url = "https://www.googleapis.com/..."
+        # ... y cualquier otro campo de tu JSON de credenciales
+        ```
+        **Importante:** La cadena de `private_key` debe incluir los `\\n` exactamente como están en tu archivo JSON para representar los saltos de línea.
+
+        ---
+        Desarrollado con Streamlit y Python.
+        """)
+
+if __name__ == "__main__":
+    main()
