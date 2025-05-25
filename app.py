@@ -12,7 +12,7 @@ from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_clie
 
 def main():
     st.set_page_config(
-        page_title="Nowgoal Data Sc_sheet
+        page_title="Nowgoal Data Sc_sheet"
 from modules.other_feature import display_other_feature_ui # Asumiendo que tienes esteraper & Tools",
         page_icon="⚽",
         layout="wide",
