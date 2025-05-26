@@ -2,6 +2,7 @@
 import streamlit as st
 from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
 from modules.other_feature import display_other_feature_ui # Asumiendo que tienes este archivo y función
+from modules.other_feature_NUEVO import display_other_feature_ui # Cambia esta línea
 
 def main():
     st.set_page_config(
