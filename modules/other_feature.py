@@ -149,7 +149,7 @@ def get_h2h_details_for_original_logic_of(driver_instance, match_id_to_check_h2h
     try:
         driver_instance.get(url_to_visit)
         WebDriverWait(driver_instance, SELENIUM_TIMEOUT_SECONDS_OF, poll_frequency=SELENIUM_POLL_FREQUENCY_OF).until(
-            EC.presence_of_element_located((By.ID, "table_v3")) 
+            EC.presence_of_element_located((By.ID, "table_v2")) 
         )
         time.sleep(0.8) 
         soup_selenium = BeautifulSoup(driver_instance.page_source, "html.parser")
@@ -160,11 +160,11 @@ def get_h2h_details_for_original_logic_of(driver_instance, match_id_to_check_h2h
 
     if not soup_selenium: return {"status": "error", "resultado": f"Fallo al obtener soup de {url_to_visit}"}
     
-    table_v3_h2h = soup_selenium.find("table", id="table_v3")
-    if not table_v3_h2h: 
+    table_v2_h2h = soup_selenium.find("table", id="table_v2")
+    if not table_v2_h2h: 
         return {"status": "error", "resultado": f"Tabla H2H (v3) no encontrada en {url_to_visit}"}
 
-    for row in table_v3_h2h.find_all("tr", id=re.compile(r"tr3_\d+")):
+    for row in table_v2_h2h.find_all("tr", id=re.compile(r"tr3_\d+")):
         links = row.find_all("a", onclick=True)
         if len(links) < 2: continue
         
