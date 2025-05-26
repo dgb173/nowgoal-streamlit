@@ -39,7 +39,6 @@ def fetch_soup_requests_of(path, max_tries=3, delay=1):
         try:
             resp = session.get(url, timeout=10)
             resp.raise_for_status()
-            # Usar html.parser o lxml si está disponible y se necesita más robustez/velocidad
             return BeautifulSoup(resp.text, "html.parser")
         except requests.RequestException:
             if attempt == max_tries: return None
@@ -47,8 +46,9 @@ def fetch_soup_requests_of(path, max_tries=3, delay=1):
     return None
 
 # --- FUNCIONES PARA LÓGICA ORIGINAL DE H2H (Columna 3) (renombradas) ---
-@st.cache_data(ttl=3600)
-def get_rival_a_for_original_h2h_of(main_match_id, soup_h2h_page): 
+@st.cache_data(ttl=3600) # Cacheado basado en main_match_id
+def get_rival_a_for_original_h2h_of(main_match_id: int): # Ya NO acepta soup_h2h_page
+    soup_h2h_page = fetch_soup_requests_of(f"/match/h2h-{main_match_id}") # Obtiene el soup aquí
     if not soup_h2h_page: return None, None, None
     table = soup_h2h_page.find("table", id="table_v1")
     if not table: return None, None, None
@@ -64,8 +64,9 @@ def get_rival_a_for_original_h2h_of(main_match_id, soup_h2h_page):
                     return key_match_id_for_h2h_url, rival_a_id_match.group(1), rival_a_name
     return None, None, None
 
-@st.cache_data(ttl=3600)
-def get_rival_b_for_original_h2h_of(main_match_id, soup_h2h_page): 
+@st.cache_data(ttl=3600) # Cacheado basado en main_match_id
+def get_rival_b_for_original_h2h_of(main_match_id: int): # Ya NO acepta soup_h2h_page
+    soup_h2h_page = fetch_soup_requests_of(f"/match/h2h-{main_match_id}") # Obtiene el soup aquí
     if not soup_h2h_page: return None, None
     table = soup_h2h_page.find("table", id="table_v2")
     if not table: return None, None
@@ -142,7 +143,6 @@ def get_h2h_details_for_original_logic_of(driver_instance, key_match_id_for_h2h_
             }
     return {"status": "not_found", "resultado": "N/A (H2H Original OF no encontrado en tabla)"}
 
-# --- FUNCIONES PARA NUEVA LÓGICA (renombradas) ---
 def get_team_league_info_from_script_of(soup):
     home_id, away_id, league_id, home_name, away_name, league_name = (None,)*3 + ("N/A",)*3
     script_tag = soup.find("script", string=re.compile(r"var _matchInfo ="))
@@ -272,13 +272,7 @@ def get_main_match_odds_selenium_of(driver):
         pass
     return odds_info
 
-
 def extract_standings_stats_from_table_of(team_table_soup, is_home_team_table_type):
-    """
-    Extrae el ranking y las estadísticas de PJ, V, E, D, GF, GC para 'Total' y 'Home'/'Away'.
-    - team_table_soup: BeautifulSoup object de la tabla de standings de un equipo (<table class="team-table-home/guest">).
-    - is_home_team_table_type: Boolean, True si es la tabla del equipo local del partido, False si es la del visitante.
-    """
     data = {
         "name": "N/A", "ranking": "N/A",
         "total_pj": "N/A", "total_v": "N/A", "total_e": "N/A", "total_d": "N/A", "total_gf": "N/A", "total_gc": "N/A",
@@ -287,70 +281,49 @@ def extract_standings_stats_from_table_of(team_table_soup, is_home_team_table_ty
     if not team_table_soup:
         return data
 
-    # Extraer Nombre y Ranking del header de la tabla
     header_row = team_table_soup.find("tr", class_=re.compile(r"team-(home|guest)"))
     if header_row:
         link = header_row.find("a")
         if link:
-            full_text = link.get_text(separator=" ", strip=True) # ej: "[AUS VPL-10]    Melbourne Victory FC (Youth)"
+            full_text = link.get_text(separator=" ", strip=True)
             name_match = re.search(r"]\s*(.*)", full_text)
             if name_match:
                 data["name"] = name_match.group(1).strip()
-            
-            rank_match = re.search(r"\[(?:[^\]]+)-(\d+)\]", full_text) # Captura el número después del último guion dentro de corchetes
+            rank_match = re.search(r"\[(?:[^\]]+)-(\d+)\]", full_text)
             if rank_match:
                 data["ranking"] = rank_match.group(1)
 
-    # Encontrar filas de datos (FT)
     ft_rows = []
     current_section = None
     for row in team_table_soup.find_all("tr", align="center"):
         th_cell = row.find("th")
         if th_cell:
-            if "FT" in th_cell.get_text(strip=True):
-                current_section = "FT"
-            elif "HT" in th_cell.get_text(strip=True): # Detenerse si llega a la sección HT
-                break 
-        
+            if "FT" in th_cell.get_text(strip=True): current_section = "FT"
+            elif "HT" in th_cell.get_text(strip=True): break 
         if current_section == "FT":
             cells = row.find_all("td")
-            if cells:
-                ft_rows.append(cells)
+            if cells: ft_rows.append(cells)
 
     for cells in ft_rows:
-        if len(cells) > 8: # Mínimo de celdas para tener hasta Pts y Rank
+        if len(cells) > 8: 
             row_type = cells[0].get_text(strip=True)
             pj, v, e, d, gf, gc = (cells[i].get_text(strip=True) for i in range(1, 7))
-            
-            # Asegurarse que sean números o "N/A"
-            pj = pj if pj else "N/A"
-            v = v if v else "N/A"
-            e = e if e else "N/A"
-            d = d if d else "N/A"
-            gf = gf if gf else "N/A"
-            gc = gc if gc else "N/A"
+            pj = pj if pj else "N/A"; v = v if v else "N/A"; e = e if e else "N/A"; d = d if d else "N/A"; gf = gf if gf else "N/A"; gc = gc if gc else "N/A"
 
             if row_type == "Total":
                 data["total_pj"], data["total_v"], data["total_e"], data["total_d"], data["total_gf"], data["total_gc"] = pj, v, e, d, gf, gc
-                # Opcional: reconfirmar ranking si es diferente al del header
-                # rank_val_row = cells[8].get_text(strip=True)
-                # if rank_val_row: data["ranking"] = rank_val_row
-            
             elif is_home_team_table_type and row_type == "Home":
                 data["specific_pj"], data["specific_v"], data["specific_e"], data["specific_d"], data["specific_gf"], data["specific_gc"] = pj, v, e, d, gf, gc
-            
             elif not is_home_team_table_type and row_type == "Away":
                 data["specific_pj"], data["specific_v"], data["specific_e"], data["specific_d"], data["specific_gf"], data["specific_gc"] = pj, v, e, d, gf, gc
     return data
 
-
 # --- STREAMLIT APP UI (Envuelto en una función) ---
 def display_other_feature_ui():
-    st.header("📊 Otra Funcionalidad (Beta)") # Título para la sub-página
-    # st.info("Contenido específico de 'Otra Funcionalidad (Beta)'")
+    st.header("📊 Estadísticas de Clasificación y Partidos (OF)")
 
     main_match_id_str_input_of = st.sidebar.text_input(
-        "🆔 ID Partido (Análisis OF):", value="2696131", # Usando el ID del HTML de ejemplo
+        "🆔 ID Partido (Análisis OF):", value="2696131",
         help="Pega el ID del partido para análisis en Other Feature.",
         key="other_feature_match_id_input"
     )
@@ -383,7 +356,6 @@ def display_other_feature_ui():
             mp_home_id_of, mp_away_id_of, mp_league_id_of, mp_home_name_from_script, mp_away_name_from_script, mp_league_name_of = \
                 get_team_league_info_from_script_of(soup_main_h2h_page_of)
             
-            # --- Extracción y Muestra de Estadísticas de Clasificación (Standings) ---
             standings_section = soup_main_h2h_page_of.find("div", id="porletP4")
             home_team_standings_data = {}
             away_team_standings_data = {}
@@ -397,16 +369,12 @@ def display_other_feature_ui():
                 if away_standings_table_soup:
                     away_team_standings_data = extract_standings_stats_from_table_of(away_standings_table_soup, False)
             
-            # Usar nombres extraídos de standings si están disponibles, sino los del script _matchInfo
             display_home_name = home_team_standings_data.get("name", mp_home_name_from_script) if home_team_standings_data.get("name", "N/A") != "N/A" else mp_home_name_from_script
             display_away_name = away_team_standings_data.get("name", mp_away_name_from_script) if away_team_standings_data.get("name", "N/A") != "N/A" else mp_away_name_from_script
-
 
             st.markdown(f"### 📋 {display_home_name or 'Local'} vs {display_away_name or 'Visitante'}")
             st.caption(f"Liga: {mp_league_name_of or 'N/A'}")
 
-
-            # Mostrar estadísticas del equipo LOCAL basadas en Standings
             if display_home_name and display_home_name != "N/A":
                 st.markdown(f"--- **{display_home_name} (Local)** ---")
                 st.markdown(f"🏆 Rk: {home_team_standings_data.get('ranking', 'N/A')}")
@@ -423,7 +391,6 @@ def display_other_feature_ui():
                             f"{home_team_standings_data.get('specific_gf', 'N/A')}-"
                             f"{home_team_standings_data.get('specific_gc', 'N/A')}")
             
-            # Mostrar estadísticas del equipo VISITANTE basadas en Standings
             if display_away_name and display_away_name != "N/A":
                 st.markdown(f"--- **{display_away_name} (Visitante)** ---")
                 st.markdown(f"🏆 Rk: {away_team_standings_data.get('ranking', 'N/A')}")
@@ -441,18 +408,16 @@ def display_other_feature_ui():
                             f"{away_team_standings_data.get('specific_gc', 'N/A')}")
             st.markdown("---")
 
-            # ---- El resto del código para cuotas, últimos partidos filtrados, H2H oponentes ---
             main_match_odds_data_of = {}
             last_home_match_in_league_of = None
             last_away_match_in_league_of = None
 
-            # Obtener IDs de rivales para H2H de Oponentes
-            key_h2h_url_for_orig_col3_of, rival_a_id_orig_col3_of, rival_a_name_orig_col3_of = get_rival_a_for_original_h2h_of(main_match_id_to_process_of, soup_main_h2h_page_of)
-            rival_b_id_orig_col3_of, rival_b_name_orig_col3_of = get_rival_b_for_original_h2h_of(main_match_id_to_process_of, soup_main_h2h_page_of)
+            key_h2h_url_for_orig_col3_of, rival_a_id_orig_col3_of, rival_a_name_orig_col3_of = get_rival_a_for_original_h2h_of(main_match_id_to_process_of) # No pasar soup
+            rival_b_id_orig_col3_of, rival_b_name_orig_col3_of = get_rival_b_for_original_h2h_of(main_match_id_to_process_of) # No pasar soup
             
-            # Gestión del WebDriver
             driver_actual_of = st.session_state.driver_other_feature
             driver_of_needs_init = False
+            # ... (resto de la lógica de gestión del driver y Selenium no cambia) ...
             if driver_actual_of is None:
                 driver_of_needs_init = True
             else:
@@ -471,6 +436,7 @@ def display_other_feature_ui():
                     driver_actual_of = get_selenium_driver_of()
                 st.session_state.driver_other_feature = driver_actual_of
 
+
             if driver_actual_of:
                 try:
                     with st.spinner("Accediendo a datos detallados con Selenium (OF)..."):
@@ -478,10 +444,10 @@ def display_other_feature_ui():
                         WebDriverWait(driver_actual_of, SELENIUM_TIMEOUT_SECONDS_OF).until(
                             EC.presence_of_element_located((By.ID, "table_v1"))
                         )
-                        time.sleep(1) # Aumentar un poco la pausa
+                        time.sleep(1) 
+                        
                         main_match_odds_data_of = get_main_match_odds_selenium_of(driver_actual_of)
-
-                        # Usar los nombres de equipo consistentes
+                        
                         if mp_home_id_of and mp_league_id_of and display_home_name and display_home_name != "N/A":
                             last_home_match_in_league_of = extract_last_match_in_league_of(
                                 driver_actual_of, "table_v1", display_home_name, mp_league_id_of,
@@ -559,7 +525,7 @@ def display_other_feature_ui():
                 else:
                     st.info(f"H2H Oponentes (OF): {details_h2h_col3_of.get('resultado', 'No disponible')}")
                 st.caption(f"H2H entre (op. generales OF): {rival_a_col3_name_of} & {rival_b_col3_name_of}")
-
+            
             end_time_of = time.time() 
             st.markdown("---")
             st.caption(f"⏱️ Tiempo total del análisis (OF): {end_time_of - start_time_of:.2f} segundos")
