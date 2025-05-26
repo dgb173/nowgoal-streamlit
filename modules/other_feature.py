@@ -46,189 +46,128 @@ def fetch_soup_requests_of(path, max_tries=3, delay=1):
     return None
 
 # --- FUNCIONES PARA LÓGICA ORIGINAL DE H2H (Columna 3) ---
-# Adaptadas de tu streamlit_app.py que funciona
+# Adaptadas ESTRICTAMENTE de tu streamlit_app.py funcional
 @st.cache_data(ttl=3600) 
 def get_rival_a_for_original_h2h_of(main_match_id: int):
     soup_h2h_page = fetch_soup_requests_of(f"/match/h2h-{main_match_id}") 
-    if not soup_h2h_page: return None, None, None
-    table = soup_h2h_page.find("table", id="table_v1")
+    if not soup_h2h_page: return None, None, None # (key_match_id, rival_id, rival_name)
+    
+    table = soup_h2h_page.find("table", id="table_v1") 
     if not table: return None, None, None
-    # Obtener el ID y nombre del equipo local del partido principal desde el script _matchInfo
-    main_home_team_name_script = "N/A"
-    main_home_id_script = "0"
-    script_info_main_match = soup_h2h_page.find("script", string=re.compile(r"var _matchInfo ="))
-    if script_info_main_match and script_info_main_match.string:
-        h_name_m = re.search(r"hName:\s*'([^']*)'", script_info_main_match.string)
-        if h_name_m: main_home_team_name_script = h_name_m.group(1).replace("\\'", "'")
-        h_id_m = re.search(r"hId:\s*parseInt\('(\d+)'\)", script_info_main_match.string)
-        if h_id_m: main_home_id_script = h_id_m.group(1)
-
+    
     for row in table.find_all("tr", id=re.compile(r"tr1_\d+")):
-        # if row.get("vs") == "1": # Esta condición parece clave en tu código original que funcionaba
-        # `vs` podría indicar si es un partido 'vs' del equipo principal o un partido listado.
-        # Si tu original funciona con "1", lo mantenemos. Si no es necesario, se puede quitar.
-        # El 'vs' atributo parece indicar si el equipo del historial es el equipo LOCAL de esa fila ('1')
-        # o el VISITANTE ('2'). No necesariamente "último partido en casa general".
-        # Ajustaremos para que coincida con la lógica que parece funcionar en tu script
-        
-        key_match_id_for_h2h_url = row.get("index") 
-        if not key_match_id_for_h2h_url: continue
-        
-        onclick_tags = row.find_all("a", onclick=re.compile(r"team\((\d+)\)"))
-        if len(onclick_tags) == 2: # Esperamos un local y un visitante en la fila
-            row_home_team_tag = onclick_tags[0]
-            row_away_team_tag = onclick_tags[1]
-
-            row_home_team_id_onclick = re.search(r"team\((\d+)\)", row_home_team_tag.get("onclick", ""))
+        if row.get("vs") == "1": # Condición clave de tu script funcional
+            key_match_id_for_h2h_url = row.get("index") 
+            if not key_match_id_for_h2h_url: continue
             
-            # Identificar cuál de los dos es el equipo principal (Melbourne Victory FC Youth en el ejemplo)
-            # Y el otro será el Rival A (Hume City en el ejemplo)
-            potential_rival_tag = None
-            if row_home_id_onclick and row_home_id_onclick.group(1) == main_home_id_script: # El equipo local del main match jugó COMO LOCAL en esta fila
-                potential_rival_tag = row_away_team_name_tag # El rival es el VISITANTE de esta fila
-            else: # El equipo local del main match jugó COMO VISITANTE en esta fila (o no es este equipo)
-                  # entonces el local de esta fila es el Rival A
-                  # Esto asume que 'table_v1' siempre tiene al equipo principal del H2H en CADA fila.
-                  # Si table_v1 tiene partidos de "main_home_id_script" donde jugó de local y donde jugó de visitante
-                  # entonces debemos chequear ambos tags
-                row_away_id_onclick = re.search(r"team\((\d+)\)", row_away_team_tag.get("onclick", ""))
-                if row_away_id_onclick and row_away_id_onclick.group(1) == main_home_id_script: # El equipo local del main match jugó COMO VISITANTE
-                     potential_rival_tag = row_home_team_tag # El rival es el LOCAL de esta fila
-                # else:
-                     # Si no es ninguno, esta fila no es relevante para Rival A respecto al main_home_team
-                     # Sin embargo, si table_v1 *solo* lista partidos vs de main_home_team
-                     # y si main_home_team está en la izquierda es el Local y si está en la derecha es el Visitante:
-                     # Esta lógica es compleja, la simplificación de "if row.get('vs') == '1'" era importante
-                     # Tomaré la lógica de tu código de ejemplo (si `vs==1` tomar onclicks[1]) como más fiable
-                     # Reintroduciendo `vs == 1` como condición primordial:
-
-            if row.get("vs") == "1": # Si esta condición de tu código original es correcta...
-                rival_tag = onclick_tags[1] # Rival A es el segundo (visitante en el partido de `key_match_id_for_h2h_url`)
+            onclicks = row.find_all("a", onclick=True) # En tu script: onclick=True
+            if len(onclicks) > 1 and onclicks[1].get("onclick"): # Tu script toma onclicks[1]
+                rival_tag = onclicks[1]
                 rival_a_id_match = re.search(r"team\((\d+)\)", rival_tag.get("onclick", ""))
                 rival_a_name = rival_tag.text.strip()
                 if rival_a_id_match and rival_a_name:
                     return key_match_id_for_h2h_url, rival_a_id_match.group(1), rival_a_name
     return None, None, None
 
-
 @st.cache_data(ttl=3600)
-def get_rival_b_for_original_h2h_of(main_match_id: int):
-    soup_h2h_page = fetch_soup_requests_of(f"/match/h2h-{main_match_id}")
-    if not soup_h2h_page: return None, None, None # Devolver 3 Nones para consistencia
+def get_rival_b_for_original_h2h_of(main_match_id: int): 
+    soup_h2h_page = fetch_soup_requests_of(f"/match/h2h-{main_match_id}") 
+    if not soup_h2h_page: return None, None, None # (match_id_ref, rival_id, rival_name)
+    
     table = soup_h2h_page.find("table", id="table_v2") 
     if not table: return None, None, None
     
-    # Lógica para Rival B similar a Rival A pero con table_v2
-    main_away_team_name_script = "N/A"; main_away_id_script = "0"
-    script_info_main_match = soup_h2h_page.find("script", string=re.compile(r"var _matchInfo ="))
-    if script_info_main_match and script_info_main_match.string:
-        g_name_m = re.search(r"gName:\s*'([^']*)'", script_info_main_match.string)
-        if g_name_m: main_away_team_name_script = g_name_m.group(1).replace("\\'", "'")
-        g_id_m = re.search(r"gId:\s*parseInt\('(\d+)'\)", script_info_main_match.string)
-        if g_id_m: main_away_id_script = g_id_m.group(1)
-
     for row in table.find_all("tr", id=re.compile(r"tr2_\d+")):
-        match_id_of_rival_b_game = row.get("index")
-        if not match_id_of_rival_b_game: continue
+        if row.get("vs") == "1": # Condición clave de tu script funcional
+            match_id_of_rival_b_game = row.get("index") # Necesitamos este para buscar standings del Rival B
+            if not match_id_of_rival_b_game: continue
 
-        onclick_tags = row.find_all("a", onclick=re.compile(r"team\((\d+)\)"))
-        if len(onclick_tags) == 2:
-            row_home_team_tag = onclick_tags[0]
-            row_away_team_tag = onclick_tags[1]
-            rival_tag = None
-            
-            row_home_id_onclick_b = re.search(r"team\((\d+)\)", row_home_team_tag.get("onclick", ""))
-            is_main_away_team_in_row_home_spot = (row_home_id_onclick_b and main_away_id_script == row_home_id_onclick_b.group(1))
-            
-            row_away_id_onclick_b = re.search(r"team\((\d+)\)", row_away_team_tag.get("onclick", ""))
-            is_main_away_team_in_row_away_spot = (row_away_id_onclick_b and main_away_id_script == row_away_id_onclick_b.group(1))
-
-            # Si el vs="1" indica que el equipo del main_match jugó en casa en ESTE PARTIDO DEL HISTORIAL
-            # Y estamos en table_v2 (historial del VISITANTE del main_match)
-            # Entonces, el vs="1" en table_v2 implicaría que el VISITANTE del main_match jugó EN CASA en ESTA fila.
-            # Y su rival sería el visitante de esa fila.
-            # Esto se alinea con tomar onclicks[0] como Rival B en el código de ejemplo si vs="1"
-            
-            if row.get("vs") == "1": # Si el VISITANTE del partido principal jugó EN CASA en esta fila (confuso)
-                                     # o si tu script que funciona interpreta `vs=1` en `table_v2` como "el primer equipo es el rival"
-                rival_tag = onclick_tags[0] # Tomando el primer equipo como rival (el local en ese partido histórico)
-
-            if rival_tag:
+            onclicks = row.find_all("a", onclick=True) # En tu script: onclick=True
+            if len(onclicks) > 0 and onclicks[0].get("onclick"): # Tu script toma onclicks[0]
+                rival_tag = onclicks[0]
                 rival_b_id_match = re.search(r"team\((\d+)\)", rival_tag.get("onclick", ""))
-                rival_b_name = rival_tag.text.strip()
+                rival_b_name = rival_tag.text.strip() 
                 if rival_b_id_match and rival_b_name:
+                    # Devolvemos el ID del partido donde se encontró a Rival B, el ID de Rival B y su nombre
                     return match_id_of_rival_b_game, rival_b_id_match.group(1), rival_b_name
     return None, None, None
 
-# ... (resto de las funciones: get_selenium_driver_of, etc., SIN CAMBIOS hasta display_other_feature_ui) ...
+# --- FUNCIONES DE SELENIUM (renombradas) ---
+@st.cache_resource 
+def get_selenium_driver_of():
+    options = ChromeOptions(); options.add_argument("--headless"); options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage"); options.add_argument("--disable-gpu")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/116.0.0.0 Safari/537.36")
+    options.add_argument('--blink-settings=imagesEnabled=false'); options.add_argument("--window-size=1920,1080")
+    try:
+        driver = webdriver.Chrome(options=options)
+        return driver
+    except WebDriverException as e:
+        return None
 
-# Esta es la función de tu streamlit_app.py, adaptada a nombres con _of
+# Adaptada de tu streamlit_app.py funcional
 def get_h2h_details_for_original_logic_of(driver_instance, key_match_id_for_h2h_url, rival_a_id, rival_b_id, rival_a_name="Rival A", rival_b_name="Rival B"):
     if not driver_instance: return {"status": "error", "resultado": "N/A (Driver no disponible H2H OF)"}
     if not key_match_id_for_h2h_url or not rival_a_id or not rival_b_id:
         return {"status": "error", "resultado": f"N/A (IDs incompletos para H2H {rival_a_name} vs {rival_b_name})"}
     
-    url = f"{BASE_URL_OF}/match/h2h-{key_match_id_for_h2h_url}"
-    # st.caption(f"H2H Logic: Visiting {url} for {rival_a_name} vs {rival_b_name}")
+    url_to_visit = f"{BASE_URL_OF}/match/h2h-{key_match_id_for_h2h_url}"
     
     try:
-        driver_instance.get(url)
+        driver_instance.get(url_to_visit)
         WebDriverWait(driver_instance, SELENIUM_TIMEOUT_SECONDS_OF, poll_frequency=SELENIUM_POLL_FREQUENCY_OF).until(
-            EC.presence_of_element_located((By.ID, "table_v2")) # ESPERANDO table_v2 según tu script
+            EC.presence_of_element_located((By.ID, "table_v2")) 
         )
         time.sleep(0.7) 
         soup_selenium = BeautifulSoup(driver_instance.page_source, "html.parser")
     except TimeoutException:
-        return {"status": "error", "resultado": f"N/A (Timeout esperando table_v2 en {url})"}
+        return {"status": "error", "resultado": f"N/A (Timeout esperando table_v2 en {url_to_visit})"}
     except Exception as e:
-        return {"status": "error", "resultado": f"N/A (Error Selenium en {url}: {type(e).__name__})"}
-    finally:
-        # No cerrar el driver aquí si se va a reusar con st.session_state
-        pass
+        return {"status": "error", "resultado": f"N/A (Error Selenium en {url_to_visit}: {type(e).__name__})"}
+    # finally: # No cerrar aquí si el driver es de session_state
+    #     pass
 
-    if not soup_selenium: return {"status": "error", "resultado": f"N/A (Fallo soup Selenium H2H Original OF en {url})"}
+    if not soup_selenium: return {"status": "error", "resultado": f"N/A (Fallo soup Selenium H2H Original OF en {url_to_visit})"}
     
-    # Parseando table_v2 de la página H2H de key_match_id_for_h2h_url
-    # Esta tabla_v2 es el historial del equipo VISITANTE del partido key_match_id_for_h2h_url
-    table_v2_on_rival_a_page = soup_selenium.find("table", id="table_v2") 
-    if not table_v2_on_rival_a_page: return {"status": "error", "resultado": "N/A (Tabla H2H Original v2 no encontrada)"}
+    table_to_search_h2h = soup_selenium.find("table", id="table_v2") # Buscando en table_v2 según tu script funcional
+    if not table_to_search_h2h: return {"status": "error", "resultado": f"N/A (Tabla v2 para H2H no encontrada en {url_to_visit})"}
 
-    for row in table_v2_on_rival_a_page.find_all("tr", id=re.compile(r"tr2_\d+")): 
+    for row in table_to_search_h2h.find_all("tr", id=re.compile(r"tr2_\d+")): 
         links = row.find_all("a", onclick=True)
         if len(links) < 2: continue
         
-        # Equipos en esta fila de la table_v2
-        row_team_home_id_m = re.search(r"team\((\d+)\)", links[0].get("onclick", ""))
-        row_team_away_id_m = re.search(r"team\((\d+)\)", links[1].get("onclick", ""))
-        if not row_team_home_id_m or not row_team_away_id_m: continue
+        h2h_row_home_id_m = re.search(r"team\((\d+)\)", links[0].get("onclick", ""))
+        h2h_row_away_id_m = re.search(r"team\((\d+)\)", links[1].get("onclick", ""))
+        if not h2h_row_home_id_m or not h2h_row_away_id_m: continue
         
-        row_team_home_id = row_team_home_id_m.group(1)
-        row_team_away_id = row_team_away_id_m.group(1)
+        h2h_row_home_id = h2h_row_home_id_m.group(1)
+        h2h_row_away_id = h2h_row_away_id_m.group(1)
         
-        # Verificar si los equipos de esta fila son rival_a_id y rival_b_id
-        if {row_team_home_id, row_team_away_id} == {str(rival_a_id), str(rival_b_id)}:
-            score_span = row.find("span", class_="fscore_2") 
+        if {h2h_row_home_id, h2h_row_away_id} == {str(rival_a_id), str(rival_b_id)}:
+            score_span = row.find("span", class_="fscore_2") # Clase de score en table_v2 (historial)
             if not score_span or not score_span.text or "-" not in score_span.text: continue
             
-            score_val = score_span.text.strip().split("(")[0] # Tomar solo score FT
-            g_h, g_a = score_val.split("-")
+            score_val = score_span.text.strip().split("(")[0].strip() 
+            g_h, g_a = score_val.split("-", 1)
             tds = row.find_all("td")
             handicap_val = "N/A"
-            HANDICAP_TD_IDX = 11 # En table_v2 (historial de un equipo) este es el índice del Handicap
+            HANDICAP_TD_IDX = 11 
             if len(tds) > HANDICAP_TD_IDX:
                 cell = tds[HANDICAP_TD_IDX]
-                d_o = cell.get("data-o"); handicap_val = d_o.strip() if d_o and d_o.strip() not in ["", "-"] else (cell.text.strip() if cell.text.strip() not in ["", "-"] else "N/A")
+                d_o = cell.get("data-o"); 
+                handicap_val = d_o.strip() if d_o and d_o.strip() not in ["", "-"] else (cell.text.strip() if cell.text.strip() not in ["", "-"] else "N/A")
             
-            # Rol de 'rival_a_id' en este partido H2H
-            rol_a_en_este_h2h = "H" if row_team_home_id == str(rival_a_id) else "A"
+            rol_a_in_this_h2h = "H" if h2h_row_home_id == str(rival_a_id) else "A"
             
             return {
                 "status": "found", "goles_home": g_h.strip(), "goles_away": g_a.strip(), 
-                "handicap": handicap_val, "rol_rival_a": rol_a_en_este_h2h, 
+                "handicap": handicap_val, "rol_rival_a": rol_a_in_this_h2h, 
                 "h2h_home_team_name": links[0].text.strip(), "h2h_away_team_name": links[1].text.strip()
             }
-    return {"status": "not_found", "resultado": f"H2H entre {rival_a_name} y {rival_b_name} no encontrado en historial (table_v2) de la página de referencia."}
+    return {"status": "not_found", "resultado": f"H2H directo no encontrado para {rival_a_name} vs {rival_b_name} en historial (table_v2) de la página de ref. ({key_match_id_for_h2h_url})."}
 
+
+# ... (FUNCIONES get_team_league_info_from_script_of, click_element_robust_of, extract_last_match_in_league_of, get_main_match_odds_selenium_of, extract_standings_data_from_h2h_page_of SE MANTIENEN IGUAL QUE EN LA RESPUESTA ANTERIOR)
 def get_team_league_info_from_script_of(soup):
     home_id, away_id, league_id, home_name, away_name, league_name = (None,)*3 + ("N/A",)*3
     script_tag = soup.find("script", string=re.compile(r"var _matchInfo ="))
@@ -345,8 +284,8 @@ def extract_standings_data_from_h2h_page_of(h2h_soup, target_team_name_exact):
             elif row_type_text == "Away" and not is_home_team_table_type: data["specific_pj"], data["specific_v"], data["specific_e"], data["specific_d"], data["specific_gf"], data["specific_gc"] = pj, v, e, d, gf, gc
     return data
 
+
 # --- STREAMLIT APP UI (Función principal) ---
-# ... (Igual que la versión anterior, sólo se modifica la llamada a get_h2h_details_for_original_logic_of abajo) ...
 def display_other_feature_ui():
     st.header("📊 Estadísticas de Clasificación y Partidos (OF)")
     main_match_id_str_input_of = st.sidebar.text_input("🆔 ID Partido (Análisis OF):", value="2696131", help="Pega el ID del partido para análisis en Other Feature.", key="other_feature_match_id_input")
@@ -388,17 +327,19 @@ def display_other_feature_ui():
             st.markdown("---")
 
             main_match_odds_data_of = {}; last_home_match_in_league_of = None; last_away_match_in_league_of = None
-            key_match_id_for_rival_a_h2h, rival_a_id_orig_col3_of, rival_a_name_orig_col3_of = get_rival_a_for_original_h2h_of(main_match_id_to_process_of)
-            match_id_rival_b_game_ref, rival_b_id_orig_col3_of, rival_b_name_orig_col3_of = get_rival_b_for_original_h2h_of(main_match_id_to_process_of) # El match_id aquí es solo de referencia para saber que Rival B se encontró
+            
+            # Usar los nombres exactos de variables como en tu script funcional para los resultados de get_rival_a y get_rival_b
+            key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_a_name_orig_col3 = get_rival_a_for_original_h2h_of(main_match_id_to_process_of)
+            match_id_rival_b_game_ref, rival_b_id_orig_col3, rival_b_name_orig_col3 = get_rival_b_for_original_h2h_of(main_match_id_to_process_of)
             
             rival_a_standings = {}; rival_b_standings = {}
             with st.spinner("Obteniendo clasificaciones de oponentes (OF)..."):
-                if rival_a_name_orig_col3_of and rival_a_name_orig_col3_of != "N/A" and key_match_id_for_rival_a_h2h: # Usar key_match_id_for_rival_a_h2h para la página H2H del Rival A
+                if rival_a_name_orig_col3 and rival_a_name_orig_col3 != "N/A" and key_match_id_for_rival_a_h2h:
                     soup_rival_a_h2h_page = fetch_soup_requests_of(f"/match/h2h-{key_match_id_for_rival_a_h2h}")
-                    if soup_rival_a_h2h_page: rival_a_standings = extract_standings_data_from_h2h_page_of(soup_rival_a_h2h_page, rival_a_name_orig_col3_of)
-                if rival_b_name_orig_col3_of and rival_b_name_orig_col3_of != "N/A" and match_id_rival_b_game_ref: # Usar match_id_rival_b_game_ref
+                    if soup_rival_a_h2h_page: rival_a_standings = extract_standings_data_from_h2h_page_of(soup_rival_a_h2h_page, rival_a_name_orig_col3)
+                if rival_b_name_orig_col3 and rival_b_name_orig_col3 != "N/A" and match_id_rival_b_game_ref:
                     soup_rival_b_h2h_page = fetch_soup_requests_of(f"/match/h2h-{match_id_rival_b_game_ref}")
-                    if soup_rival_b_h2h_page: rival_b_standings = extract_standings_data_from_h2h_page_of(soup_rival_b_h2h_page, rival_b_name_orig_col3_of)
+                    if soup_rival_b_h2h_page: rival_b_standings = extract_standings_data_from_h2h_page_of(soup_rival_b_h2h_page, rival_b_name_orig_col3)
 
             driver_actual_of = st.session_state.driver_other_feature; driver_of_needs_init = False
             if driver_actual_of is None: driver_of_needs_init = True
@@ -440,14 +381,14 @@ def display_other_feature_ui():
                 else: st.info("Último partido visitante no encontrado.")
             with col3of:
                 st.markdown(f"##### <span style='color:#E65100;'>🆚 H2H Oponentes (OF)</span><br>(Método Original)", unsafe_allow_html=True)
-                rival_a_col3_name_display = rival_a_name_orig_col3_of if rival_a_name_orig_col3_of and rival_a_name_orig_col3_of != "N/A" else (rival_a_id_orig_col3_of or "Rival A")
-                rival_b_col3_name_display = rival_b_name_orig_col3_of if rival_b_name_orig_col3_of and rival_b_name_orig_col3_of != "N/A" else (rival_b_id_orig_col3_of or "Rival B")
+                rival_a_col3_name_display = rival_a_name_orig_col3 if rival_a_name_orig_col3 and rival_a_name_orig_col3 != "N/A" else (rival_a_id_orig_col3 or "Rival A")
+                rival_b_col3_name_display = rival_b_name_orig_col3 if rival_b_name_orig_col3 and rival_b_name_orig_col3 != "N/A" else (rival_b_id_orig_col3 or "Rival B")
                 details_h2h_col3_of = {"status": "error", "resultado": "N/A (OF)"}
 
-                if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3_of and rival_b_id_orig_col3_of and driver_actual_of: 
+                if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of: 
                     with st.spinner(f"Buscando H2H: {rival_a_col3_name_display} vs {rival_b_col3_name_display}..."):
-                        # Llamamos a la función adaptada de tu script funcional
-                        details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3_of, rival_b_id_orig_col3_of, rival_a_col3_name_display, rival_b_col3_name_display)
+                        # Usar la variable correcta que se espera de get_rival_a...
+                        details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_b_id_orig_col3, rival_a_col3_name_display, rival_b_col3_name_display)
                 
                 if details_h2h_col3_of.get("status") == "found":
                     res_h2h = details_h2h_col3_of; st.markdown(f"<p style='font-size:0.9em;'><b>{res_h2h.get('h2h_home_team_name')}</b> {res_h2h.get('goles_home')} - {res_h2h.get('goles_away')} <b>{res_h2h.get('h2h_away_team_name')}</b> (AH: {res_h2h.get('handicap')})</p>", unsafe_allow_html=True)
