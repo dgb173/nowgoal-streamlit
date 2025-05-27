@@ -1,7 +1,7 @@
 # app.py (o como lo llames)
 import streamlit as st
 from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
-from modules.other_feature import display_other_feature_ui # Asumiendo que tienes este archivo y función
+from modules.scrap import scrap # Asumiendo que tienes este archivo y función
 from modules.other_feature_NUEVO import display_other_feature_ui # Cambia esta línea
 
 def main():
@@ -64,33 +64,10 @@ def main():
 
     elif selected_tool == "2. Otra Funcionalidad (Beta)":
         display_other_feature_ui()
+         elif selected_tool == "3.Scrapear datos":
+        scrap()
 
-    elif selected_tool == "3. Información General":
-        st.header("ℹ️ Información General de la Aplicación")
-        st.markdown("""
-        ---
-        ### 📚 Descripción
-        Esta aplicación incluye un **Extractor de Datos de Nowgoal** y espacio para futuras herramientas.
-
-        ### 🔐 Configuración de Credenciales (Google Sheets)
-        Para el Extractor de Datos, configura los secretos en Streamlit Cloud (o tu archivo `secrets.toml` local) bajo la clave `gcp_service_account` con el formato TOML de tus credenciales de servicio de Google.
-        Ejemplo de `secrets.toml`:
-        ```toml
-        [gcp_service_account]
-        type = "service_account"
-        project_id = "tu-project-id"
-        private_key_id = "tu-private-key-id"
-        private_key = "-----BEGIN PRIVATE KEY-----\\nTU_CLAVE_PRIVADA_CON_SALTOS_DE_LINEA_ESCAPADOS\\n-----END PRIVATE KEY-----\\n"
-        client_email = "tu-email-de-servicio@tu-project-id.iam.gserviceaccount.com"
-        client_id = "tu-client-id"
-        auth_uri = "https://accounts.google.com/o/oauth2/auth"
-        token_uri = "https://oauth2.googleapis.com/token"
-        auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-        client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/tu-email-de-servicio%40tu-project-id.iam.gserviceaccount.com"
-        universe_domain = "googleapis.com"
-        ```
-        **Importante:** La `private_key` debe incluir los `\\n` tal como están en tu archivo JSON de credenciales, pero escapados como `\\n` en el TOML.
-        """)
+    
 
 if __name__ == "__main__":
     main()
