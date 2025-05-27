@@ -800,7 +800,7 @@ def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_sear
 
 
 # --- STREAMLIT APP UI (Función principal REESTRUCTURADA) ---
-def display_other_feature_ui():
+def scrap():
     apply_custom_css_of() # Aplicar CSS personalizado al inicio de la UI
     
     st.sidebar.title("⚙️ Configuración Partido (OF)")
@@ -1129,4 +1129,4 @@ if __name__ == '__main__':
     # Es crucial inicializar el session_state si se ejecuta directamente el módulo para test
     if 'driver_other_feature' not in st.session_state:
         st.session_state.driver_other_feature = None
-    display_other_feature_ui()
+    scrap()
