@@ -631,7 +631,7 @@ def extract_comparative_match_of(soup_for_team_history, # Sopa de la página H2H
 
 
 # --- STREAMLIT APP UI (Función principal) ---
-def display_other_feature_ui():
+def scrap():
     st.header("📊 Estadísticas de Clasificación y Partidos (OF)")
     main_match_id_str_input_of = st.sidebar.text_input("🆔 ID Partido (Análisis OF):", value="2696131", help="Pega el ID del partido para análisis en Other Feature.", key="other_feature_match_id_input")
     analizar_button_of = st.sidebar.button("🚀 Analizar Partido (OF)", type="secondary", use_container_width=True, key="other_feature_analizar_button")
