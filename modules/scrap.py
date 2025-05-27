@@ -631,7 +631,7 @@ def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_sear
 
 
 # --- STREAMLIT APP UI (Función principal REESTRUCTURADA) ---
-def display_other_feature_ui():
+def scrap():
     apply_custom_css_of() # Aplicar CSS personalizado
     st.sidebar.title("⚙️ Configuración Partido (OF)")
     main_match_id_str_input_of = st.sidebar.text_input("🆔 ID Partido Principal:", value="2607237", help="Pega el ID del partido a analizar.", key="other_feature_match_id_input")
@@ -879,4 +879,4 @@ if __name__ == '__main__':
     st.set_page_config(layout="wide", page_title="Análisis Avanzado OF", initial_sidebar_state="expanded")
     if 'driver_other_feature' not in st.session_state:
         st.session_state.driver_other_feature = None
-    display_other_feature_ui()
+    scrap()
