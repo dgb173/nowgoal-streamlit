@@ -18,9 +18,14 @@ def fetch_html(url):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
     try:
-        response = requests.get(url, headers=headers, timeout=20) # Aumentado el timeout a 20 segundos
+        # Aumentado el timeout para conexiones más lentas o servidores cargados
+        response = requests.get(url, headers=headers, timeout=30) 
         response.raise_for_status()  # Lanza un error para códigos de estado HTTP 4xx/5xx
         return response.text
+    except requests.exceptions.Timeout:
+        st.error(f"❌ Error de tiempo de espera: La solicitud a '{url}' tardó demasiado.")
+        st.info("💡 La conexión puede ser lenta o el servidor de la página no responde a tiempo. Intenta de nuevo.")
+        return None
     except requests.exceptions.RequestException as e:
         st.error(f"❌ Error de red o conexión al intentar acceder a la página '{url}': {e}")
         st.info("💡 Por favor, verifica tu conexión a internet o si la URL es correcta/accesible.")
@@ -37,6 +42,52 @@ def clean_team_name(team_name_raw):
     cleaned_name = re.sub(r'\s*\([^)]*\)\s*', '', cleaned_name)
     return cleaned_name.strip()
 
+def is_upcoming_match(status_text, status_title):
+    """
+    Determina si un partido está "por comenzar" basándose en el texto de su estado
+    y su atributo title.
+    """
+    status_text_lower = status_text.lower()
+    status_title_lower = status_title.lower()
+
+    # Patrones para estados "no por comenzar"
+    live_patterns = re.compile(r'^\d+(\+|$)|ht|ft|canc|postp') # min:sec, HT, FT, Canc., Postp.
+
+    # Si contiene minutos, o 'HT', o 'FT', 'Canc.', 'Postp.' ya no es 'upcoming'
+    if live_patterns.search(status_text_lower) or \
+       'halftime' in status_title_lower or \
+       'finished' in status_title_lower or \
+       'postponed' in status_title_lower or \
+       'cancelled' in status_title_lower or \
+       'live' in status_title_lower or \
+       '2nd half' in status_title_lower or \
+       '1st half' in status_title_lower:
+        return False
+    
+    # Si la celda de status está realmente vacía (ej. " ") Y su title también, es un buen candidato para "upcoming".
+    # Algunos partidos futuros pueden tener solo la hora aquí sin título específico.
+    if status_text == '' and status_title == '': # Caso de   y title vacío
+        return True
+
+    # Si es solo una hora (e.g. "19:00"), podría ser un partido por comenzar.
+    # Pero también es lo que `mt_matchid` tiene. El `status_td` generalmente tiene  
+    # o el tiempo actual. Para estar seguro, nos basamos más en que NO sea in-play/finished.
+    
+    # Aquí podríamos añadir una heurística más: si el texto es X:XX y el título está vacío,
+    # probablemente sea próximo. Sin embargo, en NowGoal lo común para futuros es " ".
+    if re.fullmatch(r'\d{2}:\d{2}', status_text) and status_title == '':
+         st.write(f"DEBUG: Found a time format status: '{status_text}' - considering as upcoming if it reached this stage.")
+         return True # Esto podría atrapar partidos futuros si han cambiado la representación.
+
+
+    # Si no coincide con ninguna de las condiciones de 'en juego', 'terminado' o 'postergado/cancelado'
+    # y no tiene una indicación clara de haber iniciado, asumimos que es 'upcoming'.
+    # ¡CUIDADO! Esto es la parte más sensible y requiere ajuste si NowGoal cambia
+    st.write(f"DEBUG: Status '{status_text}' / title '{status_title}' does NOT explicitly mark as IN-PLAY/FINISHED. Final check might mark as Upcoming.")
+    return True # Es un poco una asunción de "todo lo demás es por comenzar"
+                 # Preferiría que la lógica de arriba con status_text=='' fuese suficiente.
+                 # Podrías necesitar ajustar esta línea a 'False' si hay muchos "upcoming" falsos.
+
 
 def scrape_upcoming_matches_logic(html_content):
     """
@@ -50,78 +101,112 @@ def scrape_upcoming_matches_logic(html_content):
     live_table = soup.find('table', id='table_live')
 
     if not live_table:
-        st.warning("⚠️ No se encontró la tabla principal de partidos (id='table_live'). La estructura del HTML puede haber cambiado.")
+        st.warning("⚠️ Scraper Error: No se encontró la tabla principal de partidos (ID: `table_live`).")
+        st.write("Verifica el código fuente de NowGoal para ver si el ID de la tabla ha cambiado.")
         return []
 
     # Bandera para saber si hemos pasado la sección de partidos en vivo/por comenzar
     # La sección "Results" (partidos terminados) comienza con <tr id="resultSplit">
     found_result_split = False
+    rows_processed_count = 0
+
+    st.subheader("🕵️‍♂️ Depuración de la Extracción de Partidos:")
 
     # Iterar sobre todas las filas <tr> dentro de la tabla principal.
     # Usamos `recursive=False` para obtener solo las filas directamente hijas y no las anidadas.
-    for row in live_table.find_all('tr', recursive=False):
-        if row.get('id') == 'resultSplit':
-            found_result_split = True
-            continue # Una vez que encontramos el separador, el resto son resultados
+    all_trs = live_table.find_all('tr', recursive=False)
+    if not all_trs:
+        st.warning("Scraper Debug: La tabla 'table_live' se encontró, pero no contiene ninguna fila `<tr>`.")
+        return []
 
-        # Procesar solo las filas de partidos (con clase 'tds') antes del separador "Results"
-        if not found_result_split and 'tds' in row.get('class', []):
+    for row in all_trs:
+        rows_processed_count += 1
+        row_id = row.get('id', 'No ID')
+        row_classes = row.get('class', [])
+
+        if row_id == 'resultSplit':
+            found_result_split = True
+            st.info(f"Scraper Debug: Detectado separador de Resultados ('{row_id}'). Deteniendo búsqueda de partidos programados.")
+            continue
+
+        if found_result_split:
+            continue # Saltar filas después del separador de resultados
+
+        # Solo procesar filas que se supone que son partidos (clase 'tds')
+        if 'tds' in row_classes:
             match_id = row.get('matchid')
 
-            if match_id: # Asegurarse de que sea una fila de partido válida
-                # Buscar la celda de estado del partido (generalmente es la que tiene el id `time_MATCHID` y clase 'status')
-                status_td = row.find('td', id=f'time_{match_id}', class_='status') 
+            if not match_id:
+                st.write(f"Scraper Debug: Fila {rows_processed_count} (ID: {row_id}, Clases: {row_classes}) parece un partido pero no tiene 'matchid'. Saltando.")
+                continue 
 
-                if status_td:
-                    # Un partido por comenzar tiene un estado de texto vacío (que puede ser  )
-                    # y su atributo 'title' también debe ser vacío para confirmar que no ha iniciado (HT, FT, 2nd Half, etc.)
-                    status_text_clean = status_td.get_text(strip=True)
-                    status_title = status_td.get('title', '').strip()
-                    
-                    # La condición clave: si el texto es vacío y el título es vacío, es un partido futuro (PROGRAMADO)
-                    # Excluimos "Postp." (pospuestos) y "Canc." (cancelados) que tendrían un title.
-                    if status_text_clean == '' and status_title == '':
-                        
-                        # Extraer nombres de los equipos
-                        home_team_tag = row.find('a', id=f'team1_{match_id}')
-                        away_team_tag = row.find('a', id=f'team2_{match_id}')
-                        
-                        home_team_name = clean_team_name(home_team_tag.get_text(strip=True)) if home_team_tag else "N/A"
-                        away_team_name = clean_team_name(away_team_tag.get_text(strip=True)) if away_team_tag else "N/A"
-                        
-                        # Extraer la hora del partido
-                        time_data_tag = row.find('td', {'name': 'timeData'})
-                        match_time = ""
-                        if time_data_tag:
-                            match_time = time_data_tag.get('data-t') # Formato 'YYYY-MM-DD HH:MM:SS'
-                        
-                        upcoming_matches_data.append({
-                            'id': match_id,
-                            'hora_utc': match_time,
-                            'equipo_local': home_team_name,
-                            'equipo_visitante': away_team_name
-                        })
+            # Buscar la celda de estado del partido (con id `time_MATCHID` y clase 'status')
+            status_td = row.find('td', id=f'time_{match_id}', class_='status') 
+            
+            if not status_td:
+                st.write(f"Scraper Debug: Partido {match_id} - NO se encontró celda de estado (ID: time_{match_id}, Clase: status). Raw HTML del partido: {row}")
+                continue # No se puede determinar el estado sin esta celda
+
+            status_text_clean = status_td.get_text(strip=True)
+            status_title = status_td.get('title', '').strip()
+
+            # DEBUGGING DEL ESTADO
+            st.write(f"Scraper Debug: Procesando Partido ID `{match_id}`")
+            st.write(f"  - Contenido `time_td` (limpio): `'{status_text_clean}'`")
+            st.write(f"  - Atributo `title` de `time_td` (limpio): `'{status_title}'`")
+            st.write(f"  - Texto visible del partido (e.g. `mt_` id): `{row.find('td', id=f'mt_{match_id}').get_text(strip=True) if row.find('td', id=f'mt_{match_id}') else 'N/A'}`")
+
+
+            if is_upcoming_match(status_text_clean, status_title):
+                # Extraer nombres de los equipos
+                home_team_tag = row.find('a', id=f'team1_{match_id}')
+                away_team_tag = row.find('a', id=f'team2_{match_id}')
                 
+                home_team_name = clean_team_name(home_team_tag.get_text(strip=True)) if home_team_tag else "N/A"
+                away_team_name = clean_team_name(away_team_tag.get_text(strip=True)) if away_team_tag else "N/A"
+                
+                # Extraer la hora del partido
+                time_data_tag = row.find('td', {'name': 'timeData'}) # Este td suele tener la hora GMT+X
+                match_time_display = time_data_tag.get_text(strip=True) if time_data_tag else "N/A"
+                match_time_utc = time_data_tag.get('data-t') if time_data_tag else "N/A" # La hora exacta en UTC
+                
+                st.success(f"¡ENCONTRADO! Partido por Comenzar: ID `{match_id}` ({home_team_name} vs {away_team_name})")
+
+                upcoming_matches_data.append({
+                    'id': match_id,
+                    'hora_utc': match_time_utc, # Formato 'YYYY-MM-DD HH:MM:SS'
+                    'hora_visible': match_time_display, # Hora visible en la tabla
+                    'equipo_local': home_team_name,
+                    'equipo_visitante': away_team_name
+                })
+            else:
+                st.write(f"  - Partido {match_id}: Descartado (No es partido por comenzar según el criterio).")
+        # else:
+        #     st.write(f"Scraper Debug: Fila {rows_processed_count} (ID: {row_id}, Clases: {row_classes}) NO es una fila 'tds'. Saltando.")
+
+
+    st.info(f"Scraper Debug: Finalizada la revisión de {rows_processed_count} filas. Se encontraron {len(upcoming_matches_data)} partidos por comenzar.")
     return upcoming_matches_data
 
-# Función principal que será llamada desde main.py
+# Función principal que será llamada desde main.py (Streamlit UI)
 def scrap():
-    st.header("⚡ Scraper de Partidos Programados ⚡")
+    st.header("⚡ Scraper de Partidos Programados de NowGoal ⚡")
     st.markdown("""
-    Esta herramienta se conecta directamente a Nowgoal.com para extraer los IDs
-    y los nombres de los equipos de los partidos que AÚN NO HAN COMENZADO (están programados).
+    Esta herramienta se conecta directamente a Nowgoal.com para extraer los IDs, las horas (UTC y visible),
+    y los nombres de los equipos de los partidos que **AÚN NO HAN COMENZADO (están programados)**.
     """)
-    st.info(f"🌐 Intentando extraer datos de: `{LIVE_SCORE_URL}`")
+    st.info(f"🌐 La URL de origen es: `{LIVE_SCORE_URL}`")
 
-    if st.button("🚀 ¡Extraer Ahora!"):
+    if st.button("🚀 ¡Extraer Partidos Programados Ahora!"):
+        st.markdown("---")
         with st.spinner("Conectando y analizando el sitio, por favor espera..."):
             html_content = fetch_html(LIVE_SCORE_URL)
 
             if html_content:
-                matches = scrape_upcoming_matches_logic(html_content)
+                matches = scrape_upcoming_matches_logic(html_content) # La lógica de depuración está aquí dentro
 
                 if matches:
-                    st.success(f"✅ ¡Extracción completada! Se encontraron {len(matches)} partidos programados.")
+                    st.subheader(f"📊 Resumen de Partidos Programados Encontrados: {len(matches)}")
                     df = pd.DataFrame(matches)
                     st.dataframe(df, use_container_width=True)
 
@@ -135,10 +220,7 @@ def scrap():
                         help="Haz clic para descargar los datos en un archivo CSV."
                     )
                 else:
-                    st.warning("🧐 No se encontraron partidos por comenzar con el criterio actual. Esto podría deberse a:")
-                    st.markdown("""
-                    - Todos los partidos ya están en juego, terminados, o se han pospuesto/cancelado.
-                    - La estructura del HTML de Nowgoal ha cambiado, y el scraper necesita una actualización.
-                    """)
+                    st.error("❌ No se encontraron partidos por comenzar con el criterio actual. Consulta la sección de 'Depuración de la Extracción de Partidos' arriba para más detalles.")
             else:
-                st.error("🚫 No se pudo obtener el contenido HTML de la página web. Consulta los mensajes de error de conexión/red arriba.")
+                st.error("🚫 No se pudo obtener el contenido HTML de la página web. Por favor, revisa los mensajes de error de conexión/red o posibles bloqueos arriba.")
+        st.markdown("---") # Separador para limpiar la depuración si no se desea.
