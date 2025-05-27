@@ -4,4 +4,7 @@ gspread
 # gspread_dataframe # Parece que no lo usas directamente, si es así, puedes quitarlo. Si alguna función lo usa, mantenlo.
 beautifulsoup4
 lxml
+streamlit
+beautifulsoup4
+pandas
 # chromedriver-py # Opcional, considerar si es necesario para el entorno de despliegue.
