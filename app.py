@@ -1,121 +1,69 @@
-# app.py
 import streamlit as st
-import pandas as pd
-
-# Asegúrate de que estos módulos y funciones existan y sean correctos
 from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
+from modules.scrap import scrap # Asumiendo que tienes este archivo y función
 from modules.other_feature_NUEVO import display_other_feature_ui
-from modules.scrap import scrape_match_data # Importar la función de scraping
 
-import logging
+def main():
+    st.set_page_config(
+        page_title="Nowgoal Data Scraper & Tools",
+        page_icon="⚽",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
 
-# Configurar logging (opcional, pero recomendado para depuración)
-# logger = logging.getLogger(__name__)
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    st.title("⚽📊 App de Análisis de Datos y Herramientas 📊⚽")
+    st.markdown("""
+    Bienvenido a la aplicación central. Usa el menú lateral para navegar entre las diferentes herramientas disponibles.
+    """)
 
-# --- Configuración de la página e Interfaz de Streamlit ---
-# ESTA ES LA ÚNICA Y CORRECTA UBICACIÓN PARA st.set_page_config
-st.set_page_config(
-    page_title="⚽📊 App de Análisis y Herramientas",
-    layout="wide",
-    page_icon="⚽", # Puedes poner un emoji o la URL de un favicon
-    initial_sidebar_state="expanded",
-    menu_items={
-       'Get Help': 'https://www.example.com/help', # Cambia esto
-       'Report a bug': "https://www.example.com/bug", # Cambia esto
-       'About': "# App de Análisis de Datos y Herramientas Deportivas" # Cambia esto
-    }
-)
+    st.sidebar.header("🛠️ Herramientas Disponibles")
+    selected_tool = st.sidebar.radio(
+        "Selecciona una herramienta:",
+        ("1. Extractor de Datos de Nowgoal", "2. Otra Funcionalidad (Beta)", "3. Scrapear datos"), # <--- CAMBIO AQUÍ
+        key="main_tool_selection_final"
+    )
 
-st.title("⚽📊 App de Análisis de Datos y Herramientas 📊⚽")
-st.markdown("""
-Bienvenido a la aplicación central. Usa el menú lateral para navegar entre las diferentes herramientas disponibles.
-""")
+    gsheets_sh_handle = None
 
-st.sidebar.header("🛠️ Herramientas Disponibles")
-selected_tool = st.sidebar.radio(
-    "Selecciona una herramienta:",
-    ("1. Extractor de Datos de Nowgoal", "2. Otra Funcionalidad (Beta)", "3. Scrapear Partidos (Nowgoal Live)"),
-    key="main_tool_selection_final"
-)
-
-
-def display_nowgoal_live_scraper_ui():
-    """
-    UI y lógica para el scraper de Nowgoal con URL fija.
-    """
-    st.subheader("🏆 Scraper de Partidos en Vivo de Nowgoal")
-
-    fixed_url = "https://live18.nowgoal25.com/"
-    st.markdown(f"**URL Fija para el scraping:** `{fixed_url}`")
-
-    if 'nowgoal_live_df' not in st.session_state:
-        st.session_state.nowgoal_live_df = pd.DataFrame()
-    if 'nowgoal_live_scrape_attempted' not in st.session_state:
-        st.session_state.nowgoal_live_scrape_attempted = False
-    if 'scraping_in_progress_live' not in st.session_state: # Nombre específico para esta herramienta
-        st.session_state.scraping_in_progress_live = False
-
-    if st.button("🚀 Extraer Datos de Partidos Ahora", key="btn_nowgoal_live_scraper", disabled=st.session_state.scraping_in_progress_live):
-        st.session_state.nowgoal_live_scrape_attempted = True
-        st.session_state.scraping_in_progress_live = True
-        st.rerun() # Para actualizar el estado del botón inmediatamente
-
-        with st.spinner(f"Accediendo a {fixed_url} y extrayendo datos... (esto puede tardar unos momentos)"):
-            df_matches_new = scrape_match_data(fixed_url) # Asegúrate que esta función existe y es robusta
-
-        st.session_state.scraping_in_progress_live = False
-
-        if df_matches_new is None:
-            st.error("Ocurrió un error crítico durante el scraping (ej. timeout, problema de red o la página no es accesible). Por favor, verifica los logs o intenta más tarde.")
-            st.session_state.nowgoal_live_df = pd.DataFrame() # Asegurar que el df se limpia
-        elif isinstance(df_matches_new, pd.DataFrame):
-            if not df_matches_new.empty:
-                st.session_state.nowgoal_live_df = df_matches_new
-                st.success(f"¡Scraping completado! Se encontraron {len(st.session_state.nowgoal_live_df)} partidos.")
-            else:
-                st.info("Se accedió a la página, pero no se encontraron datos de partidos con la estructura esperada o la tabla estaba vacía. El sitio podría no tener partidos en este momento.")
-                st.session_state.nowgoal_live_df = pd.DataFrame()
-        else:
-             st.error("El scraping devolvió un tipo de dato inesperado.")
-        st.rerun() # Para mostrar los resultados o mensajes
-
-    if not st.session_state.nowgoal_live_df.empty:
-        st.dataframe(st.session_state.nowgoal_live_df, use_container_width=True, hide_index=True)
-    elif st.session_state.nowgoal_live_scrape_attempted and not st.session_state.scraping_in_progress_live:
-        st.info("No hay datos de partidos para mostrar. Intenta extraerlos de nuevo o verifica si hay partidos disponibles en la fuente.")
-
-
-# Lógica principal de la aplicación
-if selected_tool == "1. Extractor de Datos de Nowgoal":
-    st.sidebar.info("Esta herramienta requiere configuración de Google Sheets.")
-    gsheets_sh = None # Variable local para esta herramienta
-
-    if "gcp_service_account" in st.secrets:
-        gsheets_credentials = st.secrets["gcp_service_account"]
+    if selected_tool == "1. Extractor de Datos de Nowgoal":
         try:
-            # Asumiendo que get_gsheets_client_and_sheet devuelve (client, sheet_handle)
-            # o lanza una excepción si falla.
-            g_client, gsheets_sh = get_gsheets_client_and_sheet(gsheets_credentials)
-            if gsheets_sh:
-                st.success("Conexión a Google Sheets establecida.")
-                display_nowgoal_scraper_ui(gsheets_sh) # Pasa el handle obtenido
+            if "gcp_service_account" in st.secrets:
+                gsheets_credentials = st.secrets["gcp_service_account"]
+                with st.spinner("⚙️ Estableciendo conexión con Google Sheets..."):
+                    _, gsheets_sh_handle_temp = get_gsheets_client_and_sheet(gsheets_credentials)
+
+                if not gsheets_sh_handle_temp:
+                    st.sidebar.error("❌ Error conectando a GSheets. Verifica secretos y conexión.")
+                    st.error("No se pudo conectar a Google Sheets. El extractor no funcionará.")
+                else:
+                    st.sidebar.success("🔗 Conexión a Google Sheets establecida.")
+                    gsheets_sh_handle = gsheets_sh_handle_temp
             else:
-                st.error("No se pudo obtener el handle de Google Sheets, aunque las credenciales existen. Verifica la función get_gsheets_client_and_sheet.")
+                st.sidebar.error("❗️ `gcp_service_account` NO encontrado en `st.secrets`.")
+                st.error("Error de Configuración: Faltan las credenciales de Google Sheets.")
+
         except Exception as e:
-            st.error(f"Error al conectar o configurar Google Sheets: {e}")
-            # logger.error(f"Error en get_gsheets_client_and_sheet: {e}", exc_info=True) # Si usas logging
-    else:
-        st.error("Error de Configuración: Faltan credenciales `gcp_service_account` para Google Sheets en los secretos de Streamlit.")
-        st.info("Por favor, configura los secretos para habilitar esta funcionalidad.")
+            st.sidebar.error(f"🆘 Error al procesar credenciales: {str(e)[:100]}...")
+            st.error(f"Un error ocurrió con las credenciales: {e}.")
+
+    # Este bloque if/elif/else debe estar al mismo nivel de indentación que el try/except anterior
+    if selected_tool == "1. Extractor de Datos de Nowgoal":
+        if gsheets_sh_handle:
+            display_nowgoal_scraper_ui(gsheets_sh_handle)
+        else:
+            st.warning("⚠️ La conexión a Google Sheets es necesaria para esta herramienta y no se pudo establecer.")
+            st.info("Asegúrate de que `gcp_service_account` esté configurado correctamente en los secretos de Streamlit.")
+
+    elif selected_tool == "2. Otra Funcionalidad (Beta)":
+        display_other_feature_ui()
+    # CORRECCIÓN DE INDENTACIÓN y ahora coincide con el radio button
+    elif selected_tool == "3. Scrapear datos": # <--- Debe coincidir exactamente con la opción del radio
+        scrap()
+    # Si tuvieras una opción "3. Información General", necesitarías un elif para ella también.
+    # Por ejemplo, si decides añadirla como cuarta opción y quieres que haga algo:
+    # elif selected_tool == "4. Información General":
+    # st.info("Aquí iría la información general.")
 
 
-elif selected_tool == "2. Otra Funcionalidad (Beta)":
-    # Esta función ya NO debe tener st.set_page_config() dentro de ella.
-    display_other_feature_ui()
-
-elif selected_tool == "3. Scrapear Partidos (Nowgoal Live)":
-    display_nowgoal_live_scraper_ui()
-
-st.markdown("---")
-st.caption("Aplicación construida con Streamlit. Contactar para soporte.")
+if __name__ == "__main__":
+    main()
