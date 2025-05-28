@@ -1,7 +1,7 @@
 # modules/scrap.py
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 import pandas as pd
-import logging # Mantenlo por si quieres habilitar logs localmente alguna vez
+import logging
 
 # logger = logging.getLogger(__name__) 
 # logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -19,61 +19,41 @@ def scrape_match_data(url: str):
         # logger.debug("Instancia de Playwright iniciada.")
         browser = playwright_instance.chromium.launch(
             headless=True,
-            executable_path=None, # Dejar que Playwright encuentre el navegador instalado por 'playwright install'
-            timeout=90000, # Timeout para el lanzamiento del navegador (90 segundos)
+            executable_path=None, 
+            timeout=90000, 
             args=[
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
                 '--disable-extensions',
-                # '--disable-software-rasterizer', # Podría ayudar si hay problemas de renderizado
-                # '--single-process', # No siempre recomendado, pero puede ayudar en entornos muy restringidos
                 '--disable-infobars',
                 '--window-size=1920,1080',
-                '--blink-settings=imagesEnabled=false', # Opcional: Deshabilitar imágenes para acelerar carga
-                # '--proxy-server="http://TU_PROXY_SI_USARAS_UNO"' # Si necesitaras un proxy
+                '--blink-settings=imagesEnabled=false',
             ]
         )
         # logger.debug("Navegador Chromium lanzado.")
         
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36",
-            # Puedes añadir aquí viewport, geolocalización, etc. si fuera necesario
-            # viewport={'width': 1920, 'height': 1080},
-            # java_script_enabled=True # Habilitado por defecto, pero por si acaso
         )
         page = context.new_page()
         # logger.debug(f"Navegando a {url}...")
             
         try:
-            page.goto(url, timeout=120000, wait_until='domcontentloaded') # Timeout para navegación (120s)
-            # logger.info(f"Navegación a {url} completada. Esperando selector...")
+            page.goto(url, timeout=120000, wait_until='domcontentloaded') 
         except PlaywrightTimeoutError as e:
-            # logger.error(f"Timeout durante page.goto({url}): {e}")
-            page_content_debug = page.content() # Intenta obtener contenido incluso si falla
             raise PlaywrightTimeoutError(f"Timeout (120s) al cargar la página: {url}. Error: {str(e)}")
         except Exception as e:
-            # logger.error(f"Error durante page.goto({url}): {e}")
-            page_content_debug = page.content() if page else "Página no accesible para obtener contenido."
             raise Exception(f"Error general al navegar a {url}: {str(e)}")
 
         try:
-            # Esperar que un elemento específico de la tabla esté visible, indicando que los datos dinámicos se cargaron.
-            # El selector #table_live tr.tds[matchid] es para las filas de partidos individuales.
-            page.wait_for_selector('#table_live tr.tds[matchid]', timeout=60000) # Timeout para selector (60s)
-            # logger.info("Selector '#table_live tr.tds[matchid]' encontrado.")
+            page.wait_for_selector('#table_live tr.tds[matchid]', timeout=60000)
         except PlaywrightTimeoutError:
-            # logger.warning("Timeout esperando selector '#table_live tr.tds[matchid]'. La tabla puede estar vacía o tardar mucho.")
-            # page_content_debug = page.content() # Contenido antes de que el selector falle.
-            # Esto puede ser una condición normal (no hay partidos) o un error de carga parcial.
-            return pd.DataFrame() # Devolver DataFrame vacío si no se encuentran partidos
+            return pd.DataFrame() 
 
         match_rows = page.query_selector_all('#table_live tr.tds[matchid]')
-        # logger.info(f"Encontradas {len(match_rows)} filas de partidos.")
-
         if not match_rows:
-            # logger.info("No se encontraron filas de partidos tras encontrar la tabla (lista vacía).")
             return pd.DataFrame()
 
         for i, row in enumerate(match_rows):
@@ -86,29 +66,56 @@ def scrape_match_data(url: str):
             if time_element_mt:
                 data_t = time_element_mt.get_attribute('data-t')
                 if data_t and ' ' in data_t:
-                    time_val = data_t.split(" ")[1][:5]
+                    try:
+                        time_val = data_t.split(" ")[1][:5]
+                    except IndexError:
+                        time_val = data_t 
                 elif data_t:
                      time_val = data_t
                 else:
-                    time_val_text = time_element_mt.text_content().strip()
-                    if time_val_text and ":" in time_val_text:
-                         time_val = time_val_text
+                    time_val_text = time_element_mt.text_content()
+                    if time_val_text:
+                        time_val_text = time_val_text.strip()
+                        if time_val_text and ":" in time_val_text:
+                             time_val = time_val_text
             
-            home_team_name = row.query_selector(f'td[id="ht_{match_id}"] > a[id^="team1_"]')?.text_content().split('(N)')[0].strip() or \
-                               row.query_selector(f'td[id="ht_{match_id}"] > a:first-of-type')?.text_content().split('(N)')[0].strip() or "N/A"
+            # ---- SECCIÓN CORREGIDA ----
+            home_team_name = "N/A"
+            home_team_anchor = row.query_selector(f'td[id="ht_{match_id}"] > a[id^="team1_"]')
+            if not home_team_anchor: # Fallback
+                home_team_anchor = row.query_selector(f'td[id="ht_{match_id}"] > a:first-of-type')
+            
+            if home_team_anchor:
+                home_team_text_full = home_team_anchor.text_content()
+                if home_team_text_full:
+                    home_team_name = home_team_text_full.split('(N)')[0].strip()
 
-            away_team_name = row.query_selector(f'td[id="gt_{match_id}"] > a[id^="team2_"]')?.text_content().split('(N)')[0].strip() or \
-                               row.query_selector(f'td[id="gt_{match_id}"] > a:first-of-type')?.text_content().split('(N)')[0].strip() or "N/A"
+            away_team_name = "N/A"
+            away_team_anchor = row.query_selector(f'td[id="gt_{match_id}"] > a[id^="team2_"]')
+            if not away_team_anchor: # Fallback
+                away_team_anchor = row.query_selector(f'td[id="gt_{match_id}"] > a:first-of-type')
             
+            if away_team_anchor:
+                away_team_text_full = away_team_anchor.text_content()
+                if away_team_text_full:
+                    away_team_name = away_team_text_full.split('(N)')[0].strip()
+            # ---- FIN DE SECCIÓN CORREGIDA ----
+
+            score = "N/A"
             score_element = row.query_selector('td.blue.handpoint > b')
             if score_element:
-                score = score_element.text_content().strip()
-                if score == "-": score = "Por Jugar"
-            else: # Fallback si no hay etiqueta <b>, como en partidos no iniciados
+                score_text = score_element.text_content()
+                if score_text:
+                    score = score_text.strip()
+                    if score == "-": score = "Por Jugar"
+            else: 
                 score_fallback_element = row.query_selector('td.blue.handpoint')
-                score = score_fallback_element.text_content().strip() if score_fallback_element else "N/A"
-                if score == "-": score = "Por Jugar"
-
+                if score_fallback_element:
+                    score_text_fallback = score_fallback_element.text_content()
+                    if score_text_fallback:
+                         score = score_text_fallback.strip()
+                         if score == "-": score = "Por Jugar"
+            
             match_list.append({
                 "ID Partido": match_id,
                 "Hora": time_val,
@@ -121,16 +128,9 @@ def scrape_match_data(url: str):
 
     except Exception as e:
         # logger.error(f"Excepción general en scrape_match_data: {e}", exc_info=True)
-        # Para Streamlit, podrías querer propagar el error para que lo maneje la UI
-        # o retornar None/algo que indique el fallo. Por ahora, propagar parte del mensaje:
-        # No es ideal mostrar page_content_debug en Streamlit UI, es muy grande.
-        # Esto será capturado por la app principal y se mostrará un error genérico.
-        # print(f"Error de scraping (debug): {page_content_debug[:500]}") # Local debug
         return None 
     finally:
         if browser:
             browser.close()
-            # logger.debug("Navegador Playwright cerrado.")
         if playwright_instance:
             playwright_instance.stop()
-            # logger.debug("Instancia de Playwright detenida.")
