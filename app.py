@@ -1,6 +1,6 @@
 import streamlit as st
 from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
-from modules.scrap import scrap # Asumiendo que tienes este archivo y función
+from modules.scrap import scrape_match_data
 from modules.other_feature_NUEVO import display_other_feature_ui
 
 def main():
