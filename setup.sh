@@ -1,14 +1,21 @@
 #!/bin/bash
 
-# Actualizar pip e instalar dependencias de requirements.txt (esto lo hace Streamlit antes, pero no está de más ser explícito si hay problemas)
-# pip install --upgrade pip
-# pip install -r requirements.txt # Streamlit ya debería haber hecho esto
+echo "==== Contenido de requirements.txt: ===="
+cat requirements.txt
+echo "========================================="
 
-echo "Iniciando la instalación de navegadores Playwright..."
-playwright install chromium  # Solo instala chromium si es lo único que usas
+echo "==== Instalando dependencias de Python... ===="
+pip install -r requirements.txt
+echo "========================================="
 
-# Alternativa: intentar instalar con dependencias (aunque packages.txt debería cubrirlas)
-# playwright install --with-deps chromium
 
-echo "Instalación de navegadores Playwright intentada."
-ls -R /home/appuser/.cache/ms-playwright/ # Para ver qué se instaló, útil en los logs de Streamlit Cloud
+echo "==== Iniciando instalación de navegadores Playwright (Chromium)... ===="
+playwright install chromium
+# playwright install --with-deps chromium # --with-deps a veces causa problemas en Streamlit Cloud si no tiene permisos
+
+# Para depuración, verifica dónde se instalaron los binarios (o si se instalaron)
+echo "==== Verificando instalación de Playwright en .cache... ===="
+ls -R /home/appuser/.cache/ms-playwright/
+echo "==== Fin de la verificación de Playwright ===="
+
+echo "==== Fin de setup.sh ===="
