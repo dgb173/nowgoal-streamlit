@@ -517,175 +517,6 @@ def display_other_feature_ui():
                 border-bottom: 2px solid #17a2b830;
                 padding-bottom: 8px;
             }
-
-#nueva implementacion
-    .stApp {
-        background-color: #f0f2f6;
-    }
-
-    /* Contenedor principal de la sección */
-    .stExpander {
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        padding: 20px; /* Padding interno */
-        background-color: #ffffff;
-        margin-bottom: 20px;
-    }
-    /* Título del expander */
-    .stExpander > button {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #2c3e50;
-        padding: 15px 20px;
-        background-color: #e9ecef;
-        border-radius: 8px;
-        width: 100%;
-        text-align: left;
-        border: none;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-    }
-    .stExpander > button:hover {
-        background-color: #dee2e6;
-    }
-
-
-    /* Título de sección dentro del expander */
-    .section-title {
-        font-size: 1.8rem;
-        color: #007bff;
-        text-align: center;
-        margin-top: 30px;
-        margin-bottom: 25px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
-    }
-
-    /* --- ESTILO PARA EL HÁNDICAP ACTUAL (EN GRANDE ARRIBA) --- */
-    .current-ah-card {
-        background: linear-gradient(135deg, #4CAF50, #8BC34A); /* Gradiente de verde */
-        padding: 30px;
-        border-radius: 15px;
-        color: white;
-        text-align: center;
-        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3); /* Sombra más pronunciada */
-        margin-bottom: 40px; /* Espacio debajo */
-        position: relative; /* Para el icono flotante */
-        overflow: hidden;
-    }
-    .current-ah-card::before {
-        content: "🎯"; /* Icono decorativo */
-        position: absolute;
-        top: 15px;
-        right: 20px;
-        font-size: 3.5rem;
-        opacity: 0.2;
-        transform: rotate(15deg);
-    }
-    .current-ah-card h3 {
-        font-size: 1.8rem; /* Título pequeño pero claro */
-        margin-bottom: 10px;
-        font-weight: 300;
-        opacity: 0.9;
-    }
-    .current-ah-card .ah-value {
-        font-size: 5rem; /* ¡MUY GRANDE! */
-        font-weight: 900;
-        line-height: 1;
-        text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
-        margin-bottom: 0;
-    }
-
-    /* --- ESTILO PARA EL HISTÓRICO EN EL MISMO ESTADIO --- */
-    .historical-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* 2 columnas o más si cabe */
-        gap: 25px;
-        margin-top: 20px;
-        justify-content: center; /* Centrar los elementos si no llenan la fila */
-    }
-    .historical-item {
-        background-color: #e8f5e9; /* Verde claro */
-        border: 2px solid #a5d6a7;
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        position: relative;
-        overflow: hidden;
-    }
-    .historical-item:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
-    }
-    .historical-item::before {
-        content: "📅"; /* Icono de fecha */
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        font-size: 1.8rem;
-        opacity: 0.4;
-    }
-    .historical-item .h2h-date {
-        font-size: 0.9rem;
-        color: #555;
-        margin-bottom: 15px;
-        font-weight: 500;
-        text-align: right;
-        margin-right: 5px;
-    }
-    .historical-item .h2h-combined {
-        font-size: 2.2rem; /* Tamaño grande para el resultado/handicap combinado */
-        font-weight: bold;
-        color: #2e7d32; /* Verde oscuro */
-        margin: 0;
-        line-height: 1.2;
-    }
-    .historical-item .h2h-label {
-        font-size: 0.85rem;
-        color: #666;
-        margin-top: 5px;
-    }
-
-    /* --- ESTILO PARA EL H2H GENERAL --- */
-    .h2h-general-card {
-        background-color: #e3f2fd; /* Azul claro */
-        border: 2px solid #90caf9;
-        border-radius: 12px;
-        padding: 25px;
-        text-align: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        margin-top: 40px;
-        position: relative;
-    }
-    .h2h-general-card::before {
-        content: "⚔️"; /* Icono de espadas */
-        position: absolute;
-        top: 15px;
-        right: 20px;
-        font-size: 2.5rem;
-        opacity: 0.3;
-    }
-    .h2h-general-card h4 {
-        font-size: 1.5rem;
-        color: #1976d2; /* Azul medio */
-        margin-bottom: 15px;
-        font-weight: 600;
-    }
-    .h2h-general-card .h2h-gen-value {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #0d47a1; /* Azul oscuro */
-        margin-bottom: 10px;
-    }
-    .h2h-general-card .h2h-gen-label {
-        font-size: 0.9rem;
-        color: #555;
-        margin-top: 5px;
-    }
-            
         </style>
     """, unsafe_allow_html=True)
 
@@ -946,16 +777,23 @@ def display_other_feature_ui():
                         st.caption(f"{rst.get('specific_type','Específico')}: {rst.get('specific_pj','0')}PJ | {rst.get('specific_v','0')}V/{rst.get('specific_e','0')}E/{rst.get('specific_d','0')}D | {rst.get('specific_gf','0')}GF-{rst.get('specific_gc','0')}GC")
                     else: st.caption(f"Clasificación no disponible para {name_b}.")
                 st.markdown("</div>", unsafe_allow_html=True)
-with st.expander("🔰 Hándicaps y Resultados Clave", expanded=True):
-          st.markdown("<h4 class='card-subtitle'>Enfrentamientos Directos (H2H)</h4>", unsafe_allow_html=True)
-            h2h_cols1, h2h_cols2, h2h_cols3 = st.columns(3)
-            h2h_cols1.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"], help="Hándicap Asiático del último H2H con el equipo local actual jugando en casa.")
-            h2h_cols2.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":"), help="Resultado del último H2H con el equipo local actual jugando en casa.")
-            h2h_cols3.metric("AH Actual Partido", col_data["AH_Act"], help="Hándicap Asiático inicial (Bet365) para este partido.")
 
-            h2h_g_cols1, h2h_g_cols2 = st.columns(2)
-            h2h_g_cols1.metric("AH H2H (General)", col_data["AH_H2H_G"], help="Hándicap Asiático del H2H más reciente entre ambos equipos, sin importar localía.")
-            h2h_g_cols2.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":"), help="Resultado del H2H más reciente entre ambos equipos.")
+            st.markdown("---")
+            st.markdown("<h2 class='section-header'>📊 Datos Clave Adicionales</h2>", unsafe_allow_html=True)
+            with st.expander("🔰 Hándicaps y Resultados Clave (Estilo Script Original)", expanded=True):
+ 
+                st.markdown("<h4 class='card-subtitle'>Enfrentamientos Directos (H2H)</h4>", unsafe_allow_html=True)
+                h2h_cols1, h2h_cols2, h2h_cols3 = st.columns(3)
+                h2h_cols1.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"], help="Hándicap Asiático del último H2H con el equipo local actual jugando en casa.")
+                h2h_cols2.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":"), help="Resultado del último H2H con el equipo local actual jugando en casa.")
+                h2h_cols3.metric("AH Actual Partido", col_data["AH_Act"], help="Hándicap Asiático inicial (Bet365) para este partido.")
+
+                h2h_g_cols1, h2h_g_cols2 = st.columns(2)
+                h2h_g_cols1.metric("AH H2H (General)", col_data["AH_H2H_G"], help="Hándicap Asiático del H2H más reciente entre ambos equipos, sin importar localía.")
+                h2h_g_cols2.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":"), help="Resultado del H2H más reciente entre ambos equipos.")
+                
+               
+            
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True):
  
                 comp_col1, comp_col2 = st.columns(2)
