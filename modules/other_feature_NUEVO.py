@@ -791,13 +791,7 @@ def display_other_feature_ui():
                 h2h_g_cols1.metric("AH H2H (General)", col_data["AH_H2H_G"], help="Hándicap Asiático del H2H más reciente entre ambos equipos, sin importar localía.")
                 h2h_g_cols2.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":"), help="Resultado del H2H más reciente entre ambos equipos.")
                 
-                st.markdown("<h4 class='card-subtitle' style='margin-top:15px;'>Últimos Partidos en Liga</h4>", unsafe_allow_html=True)
-                last_match_cols1, last_match_cols2, last_match_cols3, last_match_cols4 = st.columns(4)
-                last_match_cols1.metric("AH Últ. Local (Casa)",col_data["AH_L_H"], help="AH del último partido del equipo local en casa (misma liga).")
-                last_match_cols2.metric("Res Últ. Local (Casa)",col_data["Res_L_H"].replace("*",":"), help="Resultado del último partido del equipo local en casa (misma liga).")
-                last_match_cols3.metric("AH Últ. Visitante (Fuera)",col_data["AH_V_A"], help="AH del último partido del equipo visitante fuera de casa (misma liga).")
-                last_match_cols4.metric("Res Últ. Visitante (Fuera)",col_data["Res_V_A"].replace("*",":"), help="Resultado del último partido del equipo visitante fuera de casa (misma liga).")
-                st.markdown("</div>", unsafe_allow_html=True)
+               
             
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True):
  
