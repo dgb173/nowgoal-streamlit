@@ -904,6 +904,8 @@ AH: {col_data['AH_H2H_G']} | Resultado: {col_data['Res_H2H_G'].replace('*', ':')
 {col_data['Stats_V']}
 """
     return texto.strip()
+    resumen = generar_resumen_textual(col_data, display_home_name, display_away_name, mp_league_name_of)
+st.text_area("📝 Resumen Final", resumen, height=400)
 
 if __name__ == '__main__':
     st.set_page_config(layout="wide", page_title="Análisis Avanzado de Partidos (OF)", initial_sidebar_state="expanded")
