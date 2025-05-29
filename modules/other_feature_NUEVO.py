@@ -872,40 +872,7 @@ def display_other_feature_ui():
             <p><strong>Simplemente introduce el ID del partido y pulsa analizar.</strong></p>
         </div>
         """, unsafe_allow_html=True)
-def generar_resumen_textual(col_data: dict, home: str, away: str, liga: str) -> str:
-    texto = f"""
-📊 Análisis del partido entre **{home}** vs **{away}**
-Liga: {liga}
-Resultado final: {col_data['Fin'].replace('*', ':')}
--------------------------------------
-📌 Hándicap Asiático inicial: {col_data['AH_Act']}
-📌 Línea de Goles inicial: {col_data['G_i']}
 
-🔁 Último partido del local (casa):
-AH: {col_data['AH_L_H']} | Resultado: {col_data['Res_L_H'].replace('*', ':')}
-
-🔁 Último partido del visitante (fuera):
-AH: {col_data['AH_V_A']} | Resultado: {col_data['Res_V_A'].replace('*', ':')}
-
-🧩 H2H específico (local en casa vs visitante): 
-AH: {col_data['AH_H2H_V']} | Resultado: {col_data['Res_H2H_V'].replace('*', ':')}
-
-🧩 H2H general más reciente:
-AH: {col_data['AH_H2H_G']} | Resultado: {col_data['Res_H2H_G'].replace('*', ':')}
-
-🔍 Comparativa indirecta:
-- Local vs último rival del visitante: {col_data['L_vs_UV_A']}
-- Visitante vs último rival del local: {col_data['V_vs_UL_H']}
-
-📈 Estadísticas Local:
-{col_data['Stats_L']}
-
-📈 Estadísticas Visitante:
-{col_data['Stats_V']}
-"""
-    return texto.strip()
-    resumen = generar_resumen_textual(col_data, display_home_name, display_away_name, mp_league_name_of)
-st.text_area("📝 Resumen Final", resumen, height=400)
 
 if __name__ == '__main__':
     st.set_page_config(layout="wide", page_title="Análisis Avanzado de Partidos (OF)", initial_sidebar_state="expanded")
