@@ -681,7 +681,7 @@ def display_other_feature_ui():
             st.markdown("---")
             st.markdown("<h2 class='section-header'>🎯 Análisis Detallado del Partido</h2>", unsafe_allow_html=True)
             
-            with st.expander("⚖️ Cuotas Iniciales Bet365 y Marcador Final", expanded=True):
+            with st.expander("⚖️ Cuotas Iniciales Bet365 y Marcador Final", expanded=False):
  
                 st.markdown("<h4 class='card-subtitle'>Cuotas Iniciales (Bet365)</h4>", unsafe_allow_html=True)
                 cuotas_col1, cuotas_col2 = st.columns(2)
@@ -756,7 +756,7 @@ def display_other_feature_ui():
                 else: st.info(details_h2h_col3_of.get('resultado', f"H2H entre {rival_a_col3_name_display} y {rival_b_col3_name_display} no encontrado."))
                 st.markdown("</div>", unsafe_allow_html=True)
             
-            with st.expander("🔎 Clasificación Oponentes Indirectos (H2H Col3)", expanded=False):
+            with st.expander("🔎 Clasificación Oponentes Indirectos (H2H Col3)", expanded=True):
  
                 opp_stand_col1, opp_stand_col2 = st.columns(2)
                 with opp_stand_col1:
