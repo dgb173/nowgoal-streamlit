@@ -517,6 +517,175 @@ def display_other_feature_ui():
                 border-bottom: 2px solid #17a2b830;
                 padding-bottom: 8px;
             }
+
+#nueva implementacion
+    .stApp {
+        background-color: #f0f2f6;
+    }
+
+    /* Contenedor principal de la sección */
+    .stExpander {
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        padding: 20px; /* Padding interno */
+        background-color: #ffffff;
+        margin-bottom: 20px;
+    }
+    /* Título del expander */
+    .stExpander > button {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #2c3e50;
+        padding: 15px 20px;
+        background-color: #e9ecef;
+        border-radius: 8px;
+        width: 100%;
+        text-align: left;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    .stExpander > button:hover {
+        background-color: #dee2e6;
+    }
+
+
+    /* Título de sección dentro del expander */
+    .section-title {
+        font-size: 1.8rem;
+        color: #007bff;
+        text-align: center;
+        margin-top: 30px;
+        margin-bottom: 25px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+    }
+
+    /* --- ESTILO PARA EL HÁNDICAP ACTUAL (EN GRANDE ARRIBA) --- */
+    .current-ah-card {
+        background: linear-gradient(135deg, #4CAF50, #8BC34A); /* Gradiente de verde */
+        padding: 30px;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3); /* Sombra más pronunciada */
+        margin-bottom: 40px; /* Espacio debajo */
+        position: relative; /* Para el icono flotante */
+        overflow: hidden;
+    }
+    .current-ah-card::before {
+        content: "🎯"; /* Icono decorativo */
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-size: 3.5rem;
+        opacity: 0.2;
+        transform: rotate(15deg);
+    }
+    .current-ah-card h3 {
+        font-size: 1.8rem; /* Título pequeño pero claro */
+        margin-bottom: 10px;
+        font-weight: 300;
+        opacity: 0.9;
+    }
+    .current-ah-card .ah-value {
+        font-size: 5rem; /* ¡MUY GRANDE! */
+        font-weight: 900;
+        line-height: 1;
+        text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+        margin-bottom: 0;
+    }
+
+    /* --- ESTILO PARA EL HISTÓRICO EN EL MISMO ESTADIO --- */
+    .historical-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* 2 columnas o más si cabe */
+        gap: 25px;
+        margin-top: 20px;
+        justify-content: center; /* Centrar los elementos si no llenan la fila */
+    }
+    .historical-item {
+        background-color: #e8f5e9; /* Verde claro */
+        border: 2px solid #a5d6a7;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .historical-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+    }
+    .historical-item::before {
+        content: "📅"; /* Icono de fecha */
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-size: 1.8rem;
+        opacity: 0.4;
+    }
+    .historical-item .h2h-date {
+        font-size: 0.9rem;
+        color: #555;
+        margin-bottom: 15px;
+        font-weight: 500;
+        text-align: right;
+        margin-right: 5px;
+    }
+    .historical-item .h2h-combined {
+        font-size: 2.2rem; /* Tamaño grande para el resultado/handicap combinado */
+        font-weight: bold;
+        color: #2e7d32; /* Verde oscuro */
+        margin: 0;
+        line-height: 1.2;
+    }
+    .historical-item .h2h-label {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    /* --- ESTILO PARA EL H2H GENERAL --- */
+    .h2h-general-card {
+        background-color: #e3f2fd; /* Azul claro */
+        border: 2px solid #90caf9;
+        border-radius: 12px;
+        padding: 25px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        margin-top: 40px;
+        position: relative;
+    }
+    .h2h-general-card::before {
+        content: "⚔️"; /* Icono de espadas */
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-size: 2.5rem;
+        opacity: 0.3;
+    }
+    .h2h-general-card h4 {
+        font-size: 1.5rem;
+        color: #1976d2; /* Azul medio */
+        margin-bottom: 15px;
+        font-weight: 600;
+    }
+    .h2h-general-card .h2h-gen-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #0d47a1; /* Azul oscuro */
+        margin-bottom: 10px;
+    }
+    .h2h-general-card .h2h-gen-label {
+        font-size: 0.9rem;
+        color: #555;
+        margin-top: 5px;
+    }
+            
         </style>
     """, unsafe_allow_html=True)
 
@@ -777,54 +946,61 @@ def display_other_feature_ui():
                         st.caption(f"{rst.get('specific_type','Específico')}: {rst.get('specific_pj','0')}PJ | {rst.get('specific_v','0')}V/{rst.get('specific_e','0')}E/{rst.get('specific_d','0')}D | {rst.get('specific_gf','0')}GF-{rst.get('specific_gc','0')}GC")
                     else: st.caption(f"Clasificación no disponible para {name_b}.")
                 st.markdown("</div>", unsafe_allow_html=True)
-
+with st.expander("🔰 Hándicaps y Resultados Clave", expanded=True):
             st.markdown("---")
             st.markdown("<h2 class='section-header'>📊 Datos Clave Adicionales</h2>", unsafe_allow_html=True)
-        with st.expander("🔰 Hándicaps y Resultados Clave", expanded=True):
-    # --- 1. Hándicap Actual del Partido (EN GRANDE ARRIBA) ---
-    st.markdown(f"""
-        <div class="current-ah-card">
-            <h3>Hándicap Asiático Actual del Partido (Bet365)</h3>
-            <p class="ah-value">{col_data["AH_Act"]}</p>
-        </div>
-    """, unsafe_allow_html=True)
-    # --- 2. Histórico en el Mismo Estadio + Hándicap (2 filas) ---
-    st.markdown("<h3 class='section-title'>🏟️ Histórico H2H en el Mismo Estadio</h3>", unsafe_allow_html=True)
-    st.markdown('<div class="historical-grid">', unsafe_allow_html=True)
+        # --- 1. Hándicap Actual del Partido (EN GRANDE ARRIBA) ---
+            st.markdown(f"""
+                <div class="current-ah-card">
+                    <h3>Hándicap Asiático Actual del Partido (Bet365)</h3>
+                    <p class="ah-value">{col_data.get("AH_Act", "?")}</p>
+                </div>
+            """, unsafe_allow_html=True)
 
-    for i, entry in enumerate(col_data["H2H_Venue_History"]):
-        # Formato (resultado/-Handicap)
-        # Asegurarse de reemplazar '*' por ':' en el resultado
-        formatted_result = entry["result"].replace("*", ":")
-        combined_string = f"({formatted_result} / {entry['handicap']})"
+            # --- 2. Histórico en el Mismo Estadio + Hándicap ---
+            st.markdown("<h3 class='section-title'>🏟️ Histórico H2H en el Mismo Estadio</h3>", unsafe_allow_html=True)
+            
+            venue_history_data = col_data.get("H2H_Venue_History", []) # Usar .get() para seguridad
+            
+            if venue_history_data:
+                st.markdown('<div class="historical-grid">', unsafe_allow_html=True)
+                # Mostrar un máximo de, por ejemplo, 6 partidos para no saturar
+                for i, entry in enumerate(venue_history_data[:6]): 
+                    formatted_result = entry.get("result", "?*?").replace("*", ":")
+                    handicap_val = entry.get("handicap", "-")
+                    date_val = entry.get("date", "N/A")
+                    combined_string = f"({formatted_result} / {handicap_val})"
 
-        st.markdown(f"""
-            <div class="historical-item">
-                <p class="h2h-date">{entry['date']}</p>
-                <p class="h2h-combined">{combined_string}</p>
-                <p class="h2h-label">Resultado y Hándicap</p>
-            </div>
-        """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True) # Cierra el grid
+                    st.markdown(f"""
+                        <div class="historical-item">
+                            <p class="h2h-date">{date_val}</p>
+                            <p class="h2h-combined">{combined_string}</p>
+                            <p class="h2h-label">Resultado y Hándicap</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True) # Cierra el grid
+            else:
+                st.info("ℹ️ No se encontraron datos históricos de H2H en el mismo estadio (con el local actual jugando en casa) para la liga especificada, o no hay H2H directos.")
 
-    # --- 3. Último H2H General ---
-    st.markdown("<h3 class='section-title'>⚔️ Último H2H General</h3>", unsafe_allow_html=True)
-    st.markdown(f"""
-        <div class="h2h-general-card">
-            <h4>H2H Más Reciente (General)</h4>
-            <p class="h2h-gen-value">
-                {col_data["Res_H2H_G"].replace('*', ':')} / {col_data["AH_H2H_G"]}
-            </p>
-            <p class="h2h-gen-label">Resultado / Hándicap General</p>
-        </div>
-    """, unsafe_allow_html=True)
-    st.markdown("---") 
-    st.markdown("<h4 class='section-title'>🔍 Detalles Adicionales H2H (Originales)</h4>", unsafe_allow_html=True)
-    h2h_orig_cols = st.columns(2)
-    with h2h_orig_cols[0]:
-        st.info(f"**AH H2H (Local en Casa):** {col_data['AH_H2H_V']}", icon="🏠")
-    with h2h_orig_cols[1]:
-        st.info(f"**Res H2H (Local en Casa):** {col_data['Res_H2H_V'].replace('*', ':')}", icon="⚽")
+            # --- 3. Último H2H General ---
+            st.markdown("<h3 class='section-title'>⚔️ Último H2H General (Misma Liga si aplica)</h3>", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="h2h-general-card">
+                    <h4>H2H Más Reciente (General)</h4>
+                    <p class="h2h-gen-value">
+                        {col_data.get("Res_H2H_G", "?*?").replace('*', ':')} / {col_data.get("AH_H2H_G", "-")}
+                    </p>
+                    <p class="h2h-gen-label">Resultado / Hándicap General</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("---") 
+            st.markdown("<h4 class='section-title' style='font-size: 1.2rem; color: #555;'>🔍 Datos Adicionales (Información original que tenías)</h4>", unsafe_allow_html=True)
+            h2h_orig_cols = st.columns(2)
+            with h2h_orig_cols[0]:
+                st.info(f"**AH H2H (Último Local en Casa):** {col_data.get('AH_H2H_V', '-')}", icon="🏠")
+            with h2h_orig_cols[1]:
+                st.info(f"**Res H2H (Último Local en Casa):** {col_data.get('Res_H2H_V', '?*?').replace('*', ':')}", icon="⚽")
             
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True):
  
