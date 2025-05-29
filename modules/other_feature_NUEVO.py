@@ -1,3 +1,4 @@
+
 # modules/other_feature_NUEVO.py (o como lo llames)
 import streamlit as st
 import time
@@ -779,66 +780,18 @@ def display_other_feature_ui():
 
             st.markdown("---")
             st.markdown("<h2 class='section-header'>📊 Datos Clave Adicionales</h2>", unsafe_allow_html=True)
-          with st.expander("🔰 Hándicaps y Resultados Clave", expanded=True):
-    st.markdown("""
-    <style>
-      .metrics-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 1rem;
-      }
-      .metrics-table th, .metrics-table td {
-        border: 1px solid #ddd;
-        padding: 0.75rem;
-        text-align: center;
-      }
-      .metrics-table th {
-        background-color: #0a58ca;
-        color: white;
-        font-size: 1rem;
-      }
-      .metrics-table td.label {
-        font-weight: bold;
-        background-color: #f8f9fa;
-        width: 30%;
-      }
-      .metrics-table td.value {
-        font-size: 1.2rem;
-        color: #212529;
-      }
-      .metrics-table td.value.positive {
-        color: #198754;
-      }
-      .metrics-table td.value.negative {
-        color: #dc3545;
-      }
-    </style>
-    <table class="metrics-table">
-      <tr>
-        <th colspan="2">🏠 H2H Local en Casa</th>
-        <th colspan="2">🌐 H2H General</th>
-      </tr>
-      <tr>
-        <td class="label">AH Último H2H</td>
-        <td class="value">""" + col_data["AH_H2H_V"] + """</td>
-        <td class="label">AH H2H General</td>
-        <td class="value">""" + col_data["AH_H2H_G"] + """</td>
-      </tr>
-      <tr>
-        <td class="label">Res Último H2H</td>
-        <td class="value">""" + col_data["Res_H2H_V"].replace("*", ":") + """</td>
-        <td class="label">Res H2H General</td>
-        <td class="value">""" + col_data["Res_H2H_G"].replace("*", ":") + """</td>
-      </tr>
-      <tr>
-        <th colspan="4">⚖️ Hándicap Inicial del Partido</th>
-      </tr>
-      <tr>
-        <td class="label">AH Inicial</td>
-        <td class="value" colspan="3">""" + col_data["AH_Act"] + """</td>
-      </tr>
-    </table>
-    """, unsafe_allow_html=True)
+            with st.expander("🔰 Hándicaps y Resultados Clave (Estilo Script Original)", expanded=True):
+ 
+                st.markdown("<h4 class='card-subtitle'>Enfrentamientos Directos (H2H)</h4>", unsafe_allow_html=True)
+                h2h_cols1, h2h_cols2, h2h_cols3 = st.columns(3)
+                h2h_cols1.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"], help="Hándicap Asiático del último H2H con el equipo local actual jugando en casa.")
+                h2h_cols2.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":"), help="Resultado del último H2H con el equipo local actual jugando en casa.")
+                h2h_cols3.metric("AH Actual Partido", col_data["AH_Act"], help="Hándicap Asiático inicial (Bet365) para este partido.")
+
+                h2h_g_cols1, h2h_g_cols2 = st.columns(2)
+                h2h_g_cols1.metric("AH H2H (General)", col_data["AH_H2H_G"], help="Hándicap Asiático del H2H más reciente entre ambos equipos, sin importar localía.")
+                h2h_g_cols2.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":"), help="Resultado del H2H más reciente entre ambos equipos.")
+                
                
             
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True):
