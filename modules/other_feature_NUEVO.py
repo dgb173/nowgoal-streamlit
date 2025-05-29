@@ -572,7 +572,7 @@ def display_other_feature_ui():
             st.markdown("<h2 class='section-header'>📈 Clasificación General y Específica</h2>", unsafe_allow_html=True)
             col_home_stand, col_away_stand = st.columns(2)
             with col_home_stand:
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 st.markdown(f"<h3 class='card-title'>🏠 {display_home_name or 'Equipo Local'}</h3>", unsafe_allow_html=True)
                 if display_home_name and display_home_name != "N/A" and home_team_main_standings.get("name", "N/A") != "N/A":
                     hst = home_team_main_standings
@@ -584,7 +584,7 @@ def display_other_feature_ui():
                 else: st.info(f"Clasificación no disponible para {display_home_name or 'Equipo Local'}.")
                 st.markdown("</div>", unsafe_allow_html=True)
             with col_away_stand:
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 st.markdown(f"<h3 class='card-title'>✈️ {display_away_name or 'Equipo Visitante'}</h3>", unsafe_allow_html=True)
                 if display_away_name and display_away_name != "N/A" and away_team_main_standings.get("name", "N/A") != "N/A":
                     ast = away_team_main_standings
@@ -682,7 +682,7 @@ def display_other_feature_ui():
             st.markdown("<h2 class='section-header'>🎯 Análisis Detallado del Partido</h2>", unsafe_allow_html=True)
             
             with st.expander("⚖️ Cuotas Iniciales Bet365 y Marcador Final", expanded=True):
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 st.markdown("<h4 class='card-subtitle'>Cuotas Iniciales (Bet365)</h4>", unsafe_allow_html=True)
                 cuotas_col1, cuotas_col2 = st.columns(2)
                 with cuotas_col1:
@@ -710,7 +710,7 @@ def display_other_feature_ui():
             st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Reciente y Contexto H2H (Indirecto)</h3>", unsafe_allow_html=True)
             rp_col1, rp_col2, rp_col3 = st.columns(3)
             with rp_col1:
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 st.markdown(f"<h4 class='card-title'>Último <span class='home-color'>{display_home_name or 'Local'}</span> (Casa)</h4>", unsafe_allow_html=True)
                 if last_home_match_in_league_of: 
                     res = last_home_match_in_league_of
@@ -723,7 +723,7 @@ def display_other_feature_ui():
                 else: st.info(f"No se encontró último partido en casa para {display_home_name or 'Local'} en esta liga.")
                 st.markdown("</div>", unsafe_allow_html=True)
             with rp_col2:
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 st.markdown(f"<h4 class='card-title'>Último <span class='away-color'>{display_away_name or 'Visitante'}</span> (Fuera)</h4>", unsafe_allow_html=True)
                 if last_away_match_in_league_of: 
                     res = last_away_match_in_league_of
@@ -736,7 +736,7 @@ def display_other_feature_ui():
                 else: st.info(f"No se encontró último partido fuera para {display_away_name or 'Visitante'} en esta liga.")
                 st.markdown("</div>", unsafe_allow_html=True)
             with rp_col3:
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 st.markdown(f"<h4 class='card-title'>🆚 H2H Rivales (Col3)</h4>", unsafe_allow_html=True)
                 rival_a_col3_name_display = rival_a_name_orig_col3 if rival_a_name_orig_col3 and rival_a_name_orig_col3 != "N/A" else (rival_a_id_orig_col3 or "Rival A")
                 rival_b_col3_name_display = rival_b_name_orig_col3 if rival_b_name_orig_col3 and rival_b_name_orig_col3 != "N/A" else (rival_b_id_orig_col3 or "Rival B")
@@ -757,7 +757,7 @@ def display_other_feature_ui():
                 st.markdown("</div>", unsafe_allow_html=True)
             
             with st.expander("🔎 Clasificación Oponentes Indirectos (H2H Col3)", expanded=False):
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 opp_stand_col1, opp_stand_col2 = st.columns(2)
                 with opp_stand_col1:
                     name_a = rival_a_standings.get('name', rival_a_col3_name_display)
@@ -780,7 +780,7 @@ def display_other_feature_ui():
             st.markdown("---")
             st.markdown("<h2 class='section-header'>📊 Datos Clave Adicionales</h2>", unsafe_allow_html=True)
             with st.expander("🔰 Hándicaps y Resultados Clave (Estilo Script Original)", expanded=True):
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 st.markdown("<h4 class='card-subtitle'>Enfrentamientos Directos (H2H)</h4>", unsafe_allow_html=True)
                 h2h_cols1, h2h_cols2, h2h_cols3 = st.columns(3)
                 h2h_cols1.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"], help="Hándicap Asiático del último H2H con el equipo local actual jugando en casa.")
@@ -800,7 +800,7 @@ def display_other_feature_ui():
                 st.markdown("</div>", unsafe_allow_html=True)
             
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True):
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 comp_col1, comp_col2 = st.columns(2)
 
                 with comp_col1:
@@ -839,7 +839,7 @@ def display_other_feature_ui():
                 st.markdown("</div>", unsafe_allow_html=True)
 
             with st.expander("📋 Estadísticas Detalladas de Equipos (Resumen)", expanded=False):
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 stats_col1,stats_col2=st.columns(2)
                 with stats_col1: 
                     st.markdown(f"<h5 class='card-subtitle'>Estadísticas <span class='home-color'>{display_home_name or 'Local'}</span></h5>", unsafe_allow_html=True)
@@ -852,7 +852,7 @@ def display_other_feature_ui():
                 st.markdown("</div>", unsafe_allow_html=True)
 
             with st.expander("ℹ️ Información General del Partido", expanded=False):
-                st.markdown("<div class='card'>", unsafe_allow_html=True)
+ 
                 info_col1,info_col2,info_col3=st.columns(3)
                 info_col1.metric("Línea Goles Inicial",col_data["G_i"], help="Línea de goles Más/Menos (Over/Under) inicial ofrecida por Bet365.")
                 info_col2.metric("Liga",col_data["League"], help="Nombre de la liga en la que se juega el partido.")
