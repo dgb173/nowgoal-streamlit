@@ -947,61 +947,15 @@ def display_other_feature_ui():
                     else: st.caption(f"Clasificación no disponible para {name_b}.")
                 st.markdown("</div>", unsafe_allow_html=True)
 with st.expander("🔰 Hándicaps y Resultados Clave", expanded=True):
-            st.markdown("---")
-            st.markdown("<h2 class='section-header'>📊 Datos Clave Adicionales</h2>", unsafe_allow_html=True)
-        # --- 1. Hándicap Actual del Partido (EN GRANDE ARRIBA) ---
-            st.markdown(f"""
-                <div class="current-ah-card">
-                    <h3>Hándicap Asiático Actual del Partido (Bet365)</h3>
-                    <p class="ah-value">{col_data.get("AH_Act", "?")}</p>
-                </div>
-            """, unsafe_allow_html=True)
+          st.markdown("<h4 class='card-subtitle'>Enfrentamientos Directos (H2H)</h4>", unsafe_allow_html=True)
+            h2h_cols1, h2h_cols2, h2h_cols3 = st.columns(3)
+            h2h_cols1.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"], help="Hándicap Asiático del último H2H con el equipo local actual jugando en casa.")
+            h2h_cols2.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":"), help="Resultado del último H2H con el equipo local actual jugando en casa.")
+            h2h_cols3.metric("AH Actual Partido", col_data["AH_Act"], help="Hándicap Asiático inicial (Bet365) para este partido.")
 
-            # --- 2. Histórico en el Mismo Estadio + Hándicap ---
-            st.markdown("<h3 class='section-title'>🏟️ Histórico H2H en el Mismo Estadio</h3>", unsafe_allow_html=True)
-            
-            venue_history_data = col_data.get("H2H_Venue_History", []) # Usar .get() para seguridad
-            
-            if venue_history_data:
-                st.markdown('<div class="historical-grid">', unsafe_allow_html=True)
-                # Mostrar un máximo de, por ejemplo, 6 partidos para no saturar
-                for i, entry in enumerate(venue_history_data[:6]): 
-                    formatted_result = entry.get("result", "?*?").replace("*", ":")
-                    handicap_val = entry.get("handicap", "-")
-                    date_val = entry.get("date", "N/A")
-                    combined_string = f"({formatted_result} / {handicap_val})"
-
-                    st.markdown(f"""
-                        <div class="historical-item">
-                            <p class="h2h-date">{date_val}</p>
-                            <p class="h2h-combined">{combined_string}</p>
-                            <p class="h2h-label">Resultado y Hándicap</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True) # Cierra el grid
-            else:
-                st.info("ℹ️ No se encontraron datos históricos de H2H en el mismo estadio (con el local actual jugando en casa) para la liga especificada, o no hay H2H directos.")
-
-            # --- 3. Último H2H General ---
-            st.markdown("<h3 class='section-title'>⚔️ Último H2H General (Misma Liga si aplica)</h3>", unsafe_allow_html=True)
-            st.markdown(f"""
-                <div class="h2h-general-card">
-                    <h4>H2H Más Reciente (General)</h4>
-                    <p class="h2h-gen-value">
-                        {col_data.get("Res_H2H_G", "?*?").replace('*', ':')} / {col_data.get("AH_H2H_G", "-")}
-                    </p>
-                    <p class="h2h-gen-label">Resultado / Hándicap General</p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown("---") 
-            st.markdown("<h4 class='section-title' style='font-size: 1.2rem; color: #555;'>🔍 Datos Adicionales (Información original que tenías)</h4>", unsafe_allow_html=True)
-            h2h_orig_cols = st.columns(2)
-            with h2h_orig_cols[0]:
-                st.info(f"**AH H2H (Último Local en Casa):** {col_data.get('AH_H2H_V', '-')}", icon="🏠")
-            with h2h_orig_cols[1]:
-                st.info(f"**Res H2H (Último Local en Casa):** {col_data.get('Res_H2H_V', '?*?').replace('*', ':')}", icon="⚽")
-            
+            h2h_g_cols1, h2h_g_cols2 = st.columns(2)
+            h2h_g_cols1.metric("AH H2H (General)", col_data["AH_H2H_G"], help="Hándicap Asiático del H2H más reciente entre ambos equipos, sin importar localía.")
+            h2h_g_cols2.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":"), help="Resultado del H2H más reciente entre ambos equipos.")
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True):
  
                 comp_col1, comp_col2 = st.columns(2)
