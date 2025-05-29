@@ -24,7 +24,7 @@ def main():
 
     gsheets_sh_handle = None
 
-    if selected_tool == "2.Comparativa Clara":
+    if selected_tool == "1. Extractor de Datos de Nowgoal":
         try:
             if "gcp_service_account" in st.secrets:
                 gsheets_credentials = st.secrets["gcp_service_account"]
@@ -46,17 +46,17 @@ def main():
             st.error(f"Un error ocurrió con las credenciales: {e}.")
 
     # Este bloque if/elif/else debe estar al mismo nivel de indentación que el try/except anterior
-    if selected_tool == "1. WORKING":
+    if selected_tool == "1. Extractor de Datos de Nowgoal":
         if gsheets_sh_handle:
             display_nowgoal_scraper_ui(gsheets_sh_handle)
         else:
             st.warning("⚠️ La conexión a Google Sheets es necesaria para esta herramienta y no se pudo establecer.")
             st.info("Asegúrate de que `gcp_service_account` esté configurado correctamente en los secretos de Streamlit.")
 
-    elif selected_tool == "2.Comparativa Clara":
+    elif selected_tool == "2. Otra Funcionalidad (Beta)":
         display_other_feature_ui()
     # CORRECCIÓN DE INDENTACIÓN y ahora coincide con el radio button
-    elif selected_tool == "3. NO VA": # <--- Debe coincidir exactamente con la opción del radio
+    elif selected_tool == "3. Scrapear datos": # <--- Debe coincidir exactamente con la opción del radio
         scrap()
     # Si tuvieras una opción "3. Información General", necesitarías un elif para ella también.
     # Por ejemplo, si decides añadirla como cuarta opción y quieres que haga algo:
