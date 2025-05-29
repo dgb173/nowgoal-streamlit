@@ -783,14 +783,13 @@ def display_other_feature_ui():
             with st.expander("🔰 Hándicaps y Resultados Clave (Estilo Script Original)", expanded=True):
  
                 st.markdown("<h4 class='card-subtitle'>Enfrentamientos Directos (H2H)</h4>", unsafe_allow_html=True)
-                h2h_cols1, h2h_cols2, h2h_cols3 = st.columns(3)
-                h2h_cols1.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"], help="Hándicap Asiático del último H2H con el equipo local actual jugando en casa.")
-                h2h_cols2.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":"), help="Resultado del último H2H con el equipo local actual jugando en casa.")
-                h2h_cols3.metric("AH Actual Partido", col_data["AH_Act"], help="Hándicap Asiático inicial (Bet365) para este partido.")
+                h2h_cols1, h2h_cols2 = st.columns(2)
+                h2h_cols1.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"], help="HA")
+                h2h_cols2.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":"), help="Resultado ultimo partido en este estadio")
 
                 h2h_g_cols1, h2h_g_cols2 = st.columns(2)
-                h2h_g_cols1.metric("AH H2H (General)", col_data["AH_H2H_G"], help="Hándicap Asiático del H2H más reciente entre ambos equipos, sin importar localía.")
-                h2h_g_cols2.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":"), help="Resultado del H2H más reciente entre ambos equipos.")
+                h2h_g_cols1.metric("AH H2H (General)", col_data["AH_H2H_G"], help="HA")
+                h2h_g_cols2.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":"), help="Resultado más reciente entre ambos equipos.")
                 
                
             
