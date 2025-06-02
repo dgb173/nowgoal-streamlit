@@ -405,7 +405,7 @@ def display_chatbot_ui(match_data):
     def load_chatbot_model():
         # Using a smaller model for quicker loading and generation
         # Using device=-1 for CPU to avoid CUDA issues in environments where GPU might not be configured
-        return pipeline('text-generation', model='distilgpt2', device=-1 if not torch.cuda.is_available() else 0)
+        return pipeline('text-generation', model='sshleifer/tiny-gpt2', device=-1 if not torch.cuda.is_available() else 0)
     
     chatbot_pipeline = load_chatbot_model()
 
