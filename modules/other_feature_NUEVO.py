@@ -1,6 +1,8 @@
 
 # modules/other_feature_NUEVO.py (o como lo llames)
 import streamlit as st
+from transformers import pipeline, set_seed
+import torch
 import time
 import requests
 import re
@@ -395,6 +397,55 @@ def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_sear
             return f"{score}/{ah_line_extracted} {localia}".strip()
     return "-"
 
+def display_chatbot_ui(match_data):
+    st.markdown("<h2 class='section-header'>🤖 Chatbot de Pronósticos IA</h2>", unsafe_allow_html=True)
+    st.caption("Soy un chatbot de IA. Hazme preguntas sobre el posible resultado, rendimiento de los equipos o cualquier otro aspecto del partido. Mis respuestas se basan en los datos mostrados arriba. Recuerda que soy una herramienta de análisis y los pronósticos no son garantizados.")
+
+    @st.cache_resource
+    def load_chatbot_model():
+        # Using a smaller model for quicker loading and generation
+        # Using device=-1 for CPU to avoid CUDA issues in environments where GPU might not be configured
+        return pipeline('text-generation', model='distilgpt2', device=-1 if not torch.cuda.is_available() else 0)
+    
+    chatbot_pipeline = load_chatbot_model()
+
+    if "chatbot_messages" not in st.session_state:
+        st.session_state.chatbot_messages = [{"role": "assistant", "content": "Hola! ¿Cómo puedo ayudarte con el pronóstico de este partido?"}]
+
+    for msg in st.session_state.chatbot_messages:
+        st.chat_message(msg["role"]).write(msg["content"])
+
+    if prompt := st.chat_input("Pregúntame sobre el pronóstico..."):
+        st.session_state.chatbot_messages.append({"role": "user", "content": prompt})
+        st.chat_message("user").write(prompt)
+
+        detailed_prompt = f"Basado en los siguientes datos del partido de fútbol entre {match_data.get('home_team_name', 'Local')} y {match_data.get('away_team_name', 'Visitante')} en la liga {match_data.get('league_name', 'desconocida')}:\n"
+        detailed_prompt += f"- Clasificación Local: {match_data.get('home_team_standings', {})}\n"
+        detailed_prompt += f"- Clasificación Visitante: {match_data.get('away_team_standings', {})}\n"
+        detailed_prompt += f"- Cuotas Principales: {match_data.get('main_match_odds', {})}\n"
+        if match_data.get('last_home_match'):
+            detailed_prompt += f"- Último partido del Local en casa: {match_data['last_home_match']}\n"
+        if match_data.get('last_away_match'):
+            detailed_prompt += f"- Último partido del Visitante fuera: {match_data['last_away_match']}\n"
+        detailed_prompt += f"- H2H (Local en casa): Resultado {match_data.get('h2h_direct_specific_local_res', 'N/A')}, AH {match_data.get('h2h_direct_specific_local_ah', 'N/A')}\n"
+        detailed_prompt += f"- H2H (General): Resultado {match_data.get('h2h_direct_general_res', 'N/A')}, AH {match_data.get('h2h_direct_general_ah', 'N/A')}\n"
+        if match_data.get('final_score_if_available') and match_data['final_score_if_available'] != '?*?':
+           detailed_prompt += f"- Marcador Final (si ya se jugó): {match_data['final_score_if_available']}\n"
+        
+        detailed_prompt += f"\nConsiderando estos datos, responde a la siguiente pregunta del usuario de forma detallada y como un experto en pronósticos deportivos: {prompt}\nRespuesta:"
+
+        try:
+            with st.spinner("🤖 Pensando..."):
+                response = chatbot_pipeline(detailed_prompt, max_length=350, num_return_sequences=1, pad_token_id=chatbot_pipeline.model.config.eos_token_id) 
+                assistant_response = response[0]['generated_text'].replace(detailed_prompt, "").strip()
+                if not assistant_response: 
+                    assistant_response = "No pude generar una respuesta específica en este momento. Intenta reformular tu pregunta."
+        except Exception as e:
+            assistant_response = f"Lo siento, ocurrió un error al generar el pronóstico: {str(e)}"
+
+        st.session_state.chatbot_messages.append({"role": "assistant", "content": assistant_response})
+        st.chat_message("assistant").write(assistant_response)
+
 # --- STREAMLIT APP UI (Función principal) ---
 def display_other_feature_ui():
     
@@ -678,6 +729,25 @@ def display_other_feature_ui():
             if last_home_opponent_for_away_hist and display_away_name != "N/A":
                 col_data["V_vs_UL_H"] = extract_comparative_match_of(soup_main_h2h_page_of, "table_v2", display_away_name, last_home_opponent_for_away_hist, mp_league_id_of, is_home_table=False)
             # --- Fin población col_data ---
+            
+            # --- Preparar datos para el Chatbot ---
+            match_data_for_chatbot = {
+                "home_team_name": display_home_name if 'display_home_name' in locals() else placeholder_nodata,
+                "away_team_name": display_away_name if 'display_away_name' in locals() else placeholder_nodata,
+                "league_name": mp_league_name_of if 'mp_league_name_of' in locals() else placeholder_nodata,
+                "home_team_standings": home_team_main_standings if 'home_team_main_standings' in locals() else {},
+                "away_team_standings": away_team_main_standings if 'away_team_main_standings' in locals() else {},
+                "main_match_odds": main_match_odds_data_of if 'main_match_odds_data_of' in locals() else {},
+                "last_home_match": last_home_match_in_league_of if 'last_home_match_in_league_of' in locals() and last_home_match_in_league_of else None,
+                "last_away_match": last_away_match_in_league_of if 'last_away_match_in_league_of' in locals() and last_away_match_in_league_of else None,
+                "h2h_direct_specific_local_res": col_data.get("Res_H2H_V", "N/A"),
+                "h2h_direct_specific_local_ah": col_data.get("AH_H2H_V", "N/A"),
+                "h2h_direct_general_res": col_data.get("Res_H2H_G", "N/A"),
+                "h2h_direct_general_ah": col_data.get("AH_H2H_G", "N/A"),
+                "final_score_if_available": col_data.get("Fin", "?*?"),
+                "current_ah_line": col_data.get("AH_Act", "?"),
+                "current_goals_line": col_data.get("G_i", "?")
+            }
 
             st.markdown("---")
             st.markdown("<h2 class='section-header'>🎯 Análisis Detallado del Partido</h2>", unsafe_allow_html=True)
@@ -853,6 +923,13 @@ def display_other_feature_ui():
                 info_col2.metric("Liga",col_data["League"], help="Nombre de la liga en la que se juega el partido.")
                 info_col3.metric("ID Partido",col_data["match_id"], help="Identificador único del partido en la plataforma de origen.")
                 st.markdown("</div>", unsafe_allow_html=True)
+
+            # --- Integración del Chatbot ---
+            if 'match_data_for_chatbot' in locals() and match_data_for_chatbot: # Check if data was prepared
+                st.markdown("---") # Add a separator
+                display_chatbot_ui(match_data_for_chatbot)
+            else:
+                st.warning("⚠️ No se pudieron cargar los datos para el chatbot.")
 
             end_time_of = time.time()
             st.sidebar.success(f"🎉 Análisis completado en {end_time_of - start_time_of:.2f} segundos.")
