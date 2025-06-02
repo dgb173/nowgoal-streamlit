@@ -1,8 +1,6 @@
 
 # modules/other_feature_NUEVO.py (o como lo llames)
 import streamlit as st
-from transformers import pipeline, set_seed
-import torch
 import time
 import requests
 import re
@@ -133,9 +131,7 @@ def fetch_soup_requests_of(path, max_tries=3, delay=1):
             time.sleep(delay * attempt)
     return None
 
-@st.cache_data(ttl=3600) 
-def get_rival_a_for_original_h2h_of(main_match_id: int):
-    soup_h2h_page = fetch_soup_requests_of(f"/match/h2h-{main_match_id}") 
+def get_rival_a_for_original_h2h_of(soup_h2h_page: BeautifulSoup):
     if not soup_h2h_page: return None, None, None
     table = soup_h2h_page.find("table", id="table_v1") 
     if not table: return None, None, None
@@ -150,9 +146,7 @@ def get_rival_a_for_original_h2h_of(main_match_id: int):
                 if rival_a_id_match and rival_a_name: return key_match_id_for_h2h_url, rival_a_id_match.group(1), rival_a_name
     return None, None, None
 
-@st.cache_data(ttl=3600)
-def get_rival_b_for_original_h2h_of(main_match_id: int):
-    soup_h2h_page = fetch_soup_requests_of(f"/match/h2h-{main_match_id}") 
+def get_rival_b_for_original_h2h_of(soup_h2h_page: BeautifulSoup):
     if not soup_h2h_page: return None, None, None
     table = soup_h2h_page.find("table", id="table_v2") 
     if not table: return None, None, None
@@ -176,6 +170,7 @@ def get_selenium_driver_of():
     try: return webdriver.Chrome(options=options)
     except WebDriverException as e: st.error(f"Error inicializando Selenium driver (OF): {e}"); return None
 
+@st.cache_data(ttl=3600)
 def get_h2h_details_for_original_logic_of(driver_instance, key_match_id_for_h2h_url, rival_a_id, rival_b_id, rival_a_name="Rival A", rival_b_name="Rival B"):
     if not driver_instance: return {"status": "error", "resultado": "N/A (Driver no disponible H2H OF)"}
     if not key_match_id_for_h2h_url or not rival_a_id or not rival_b_id: return {"status": "error", "resultado": f"N/A (IDs incompletos para H2H {rival_a_name} vs {rival_b_name})"}
@@ -233,12 +228,13 @@ def click_element_robust_of(driver, by, value, timeout=7):
         return True
     except Exception: return False
 
-def extract_last_match_in_league_of(driver, table_css_id_str, main_team_name_in_table, league_id_filter_value, home_or_away_filter_css_selector, is_home_game_filter):
+@st.cache_data(ttl=3600)
+def extract_last_match_in_league_of(driver, table_css_id_str, main_team_name_in_table, league_id_filter_value, home_or_away_filter_css_selector, is_home_game_filter, unique_cache_key_param: str):
     try:
         if league_id_filter_value:
             league_checkbox_selector = f"input#checkboxleague{table_css_id_str[-1]}[value='{league_id_filter_value}']"
-            click_element_robust_of(driver, By.CSS_SELECTOR, league_checkbox_selector); time.sleep(1.0)
-        click_element_robust_of(driver, By.CSS_SELECTOR, home_or_away_filter_css_selector); time.sleep(1.0)
+            click_element_robust_of(driver, By.CSS_SELECTOR, league_checkbox_selector); time.sleep(0.3)
+        click_element_robust_of(driver, By.CSS_SELECTOR, home_or_away_filter_css_selector); time.sleep(0.3)
         page_source_updated = driver.page_source; soup_updated = BeautifulSoup(page_source_updated, "html.parser")
         table = soup_updated.find("table", id=table_css_id_str)
         if not table: return None
@@ -265,9 +261,11 @@ def extract_last_match_in_league_of(driver, table_css_id_str, main_team_name_in_
         return None
     except Exception: return None
 
-def get_main_match_odds_selenium_of(driver):
+@st.cache_data(ttl=3600)
+def get_main_match_odds_selenium_of(driver, main_match_id_str: str):
     odds_info = {"ah_home_cuota": "N/A", "ah_linea_raw": "N/A", "ah_away_cuota": "N/A", "goals_over_cuota": "N/A", "goals_linea_raw": "N/A", "goals_under_cuota": "N/A"}
     try:
+        # Note: main_match_id_str is part of the cache key but not directly used in URL here as driver navigates to a general page first
         live_compare_div = WebDriverWait(driver, SELENIUM_TIMEOUT_SECONDS_OF, poll_frequency=SELENIUM_POLL_FREQUENCY_OF).until(EC.presence_of_element_located((By.ID, "liveCompareDiv")))
         bet365_row_selector = "tr#tr_o_1_8[name='earlyOdds']"; bet365_row_selector_alt = "tr#tr_o_1_31[name='earlyOdds']"
         table_odds = live_compare_div.find_element(By.XPATH, ".//table[contains(@class, 'team-table-other')]")
@@ -396,54 +394,6 @@ def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_sear
             localia = 'H' if team_main_lower == home_hist else 'A'
             return f"{score}/{ah_line_extracted} {localia}".strip()
     return "-"
-
-def display_chatbot_ui(match_data):
-    st.markdown("<h2 class='section-header'>🤖 Chatbot de Pronósticos IA</h2>", unsafe_allow_html=True)
-    st.caption("Soy un chatbot de IA. Hazme preguntas sobre el posible resultado, rendimiento de los equipos o cualquier otro aspecto del partido. Mis respuestas se basan en los datos mostrados arriba. Recuerda que soy una herramienta de análisis y los pronósticos no son garantizados.")
-
-    @st.cache_resource
-    def load_chatbot_model():
-        # Using a smaller model for quicker loading and generation
-        # Using device=-1 for CPU to avoid CUDA issues in environments where GPU might not be configured
-        return pipeline('text-generation', model='distilgpt2', device=-1 if not torch.cuda.is_available() else 0)
-    
-    chatbot_pipeline = load_chatbot_model()
-
-    if "chatbot_messages" not in st.session_state:
-        st.session_state.chatbot_messages = [{"role": "assistant", "content": "Hola! ¿Cómo puedo ayudarte con el pronóstico de este partido?"}]
-
-    for msg in st.session_state.chatbot_messages:
-        st.chat_message(msg["role"]).write(msg["content"])
-
-    if prompt := st.chat_input("Pregúntame sobre el pronóstico..."):
-        st.session_state.chatbot_messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
-
-        home_rank = match_data.get('home_team_standings', {}).get('ranking', 'N/A')
-        away_rank = match_data.get('away_team_standings', {}).get('ranking', 'N/A')
-        main_ah_line_formatted = format_ah_as_decimal_string_of(match_data.get('main_match_odds', {}).get('ah_linea_raw', '?'))
-
-        detailed_prompt = (
-            f"Datos clave del partido: {match_data.get('home_team_name', 'Local')} vs {match_data.get('away_team_name', 'Visitante')} en la liga {match_data.get('league_name', 'desconocida')}.\n"
-            f"- Ranking Local: {home_rank}\n"
-            f"- Ranking Visitante: {away_rank}\n"
-            f"- Línea AH Principal: {main_ah_line_formatted}\n"
-            f"- Resultado H2H General: {match_data.get('h2h_direct_general_res', 'N/A')}\n"
-            f"Basándote en estos datos clave: Ranking Local, Ranking Visitante, Línea AH Principal, y Resultado H2H General, actúa como un analista deportivo. Redacta un pronóstico de aproximadamente 70 palabras con estilo humano. Pregunta del usuario: {prompt}\n"
-            f"Pronóstico (aprox. 70 palabras):"
-        )
-
-        try:
-            with st.spinner("🤖 Pensando..."):
-                response = chatbot_pipeline(detailed_prompt, max_length=120, num_return_sequences=1, pad_token_id=chatbot_pipeline.model.config.eos_token_id) 
-                assistant_response = response[0]['generated_text'].replace(detailed_prompt, "").strip()
-                if not assistant_response: 
-                    assistant_response = "No pude generar una respuesta específica en este momento. Intenta reformular tu pregunta."
-        except Exception as e:
-            assistant_response = f"Lo siento, ocurrió un error al generar el pronóstico: {str(e)}"
-
-        st.session_state.chatbot_messages.append({"role": "assistant", "content": assistant_response})
-        st.chat_message("assistant").write(assistant_response)
 
 # --- STREAMLIT APP UI (Función principal) ---
 def display_other_feature_ui():
@@ -614,6 +564,10 @@ def display_other_feature_ui():
             
             display_home_name = home_team_main_standings.get("name", mp_home_name_from_script) if home_team_main_standings.get("name", "N/A") != "N/A" else mp_home_name_from_script
             display_away_name = away_team_main_standings.get("name", mp_away_name_from_script) if away_team_main_standings.get("name", "N/A") != "N/A" else mp_away_name_from_script
+    
+    # Call refactored functions with soup_main_h2h_page_of
+    key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_a_name_orig_col3 = get_rival_a_for_original_h2h_of(soup_main_h2h_page_of)
+    match_id_rival_b_game_ref, rival_b_id_orig_col3, rival_b_name_orig_col3 = get_rival_b_for_original_h2h_of(soup_main_h2h_page_of)
 
             st.markdown(f"<p class='main-title'>📊 Análisis Avanzado de Partido (OF) ⚽</p>", unsafe_allow_html=True)
             st.markdown(f"<p class='sub-title'>🆚 <span class='home-color'>{display_home_name or 'Equipo Local'}</span> vs <span class='away-color'>{display_away_name or 'Equipo Visitante'}</span></p>", unsafe_allow_html=True)
@@ -647,8 +601,8 @@ def display_other_feature_ui():
                 else: st.info(f"Clasificación no disponible para {display_away_name or 'Equipo Visitante'}.")
                 st.markdown("</div>", unsafe_allow_html=True)
             
-            key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_a_name_orig_col3 = get_rival_a_for_original_h2h_of(main_match_id_to_process_of)
-            match_id_rival_b_game_ref, rival_b_id_orig_col3, rival_b_name_orig_col3 = get_rival_b_for_original_h2h_of(main_match_id_to_process_of)
+            # key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_a_name_orig_col3 are now fetched above
+            # match_id_rival_b_game_ref, rival_b_id_orig_col3, rival_b_name_orig_col3 are now fetched above
             rival_a_standings = {}; rival_b_standings = {}
             with st.spinner("📊 Extrayendo clasificaciones de oponentes indirectos (Col3)..."):
                 if rival_a_name_orig_col3 and rival_a_name_orig_col3 != "N/A" and key_match_id_for_rival_a_h2h:
@@ -679,11 +633,13 @@ def display_other_feature_ui():
                         driver_actual_of.get(f"{BASE_URL_OF}{main_page_url_h2h_view_of}") 
                         WebDriverWait(driver_actual_of, SELENIUM_TIMEOUT_SECONDS_OF).until(EC.presence_of_element_located((By.ID, "table_v1"))) 
                         time.sleep(0.8) # Pequeña pausa para asegurar carga completa de JS
-                        main_match_odds_data_of = get_main_match_odds_selenium_of(driver_actual_of)
+                        main_match_odds_data_of = get_main_match_odds_selenium_of(driver_actual_of, str(main_match_id_to_process_of))
                         if mp_home_id_of and mp_league_id_of and display_home_name and display_home_name != "N/A":
-                             last_home_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v1", display_home_name, mp_league_id_of, "input#cb_sos1[value='1']", is_home_game_filter=True)
+                             home_cache_key = f"last_match_{str(main_match_id_to_process_of)}_{display_home_name}_{mp_league_id_of}_home"
+                             last_home_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v1", display_home_name, mp_league_id_of, "input#cb_sos1[value='1']", is_home_game_filter=True, unique_cache_key_param=home_cache_key)
                         if mp_away_id_of and mp_league_id_of and display_away_name and display_away_name != "N/A":
-                            last_away_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v2", display_away_name, mp_league_id_of, "input#cb_sos2[value='2']", is_home_game_filter=False)
+                            away_cache_key = f"last_match_{str(main_match_id_to_process_of)}_{display_away_name}_{mp_league_id_of}_away"
+                            last_away_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v2", display_away_name, mp_league_id_of, "input#cb_sos2[value='2']", is_home_game_filter=False, unique_cache_key_param=away_cache_key)
                 except Exception as e_main_sel_of: st.error(f"❗ Error durante la extracción con Selenium: {type(e_main_sel_of).__name__}. Algunos datos podrían faltar.")
             else: st.warning("❗ WebDriver no disponible. No se podrán obtener cuotas iniciales ni últimos partidos filtrados por liga/localía.")
 
@@ -728,25 +684,6 @@ def display_other_feature_ui():
             if last_home_opponent_for_away_hist and display_away_name != "N/A":
                 col_data["V_vs_UL_H"] = extract_comparative_match_of(soup_main_h2h_page_of, "table_v2", display_away_name, last_home_opponent_for_away_hist, mp_league_id_of, is_home_table=False)
             # --- Fin población col_data ---
-            
-            # --- Preparar datos para el Chatbot ---
-            match_data_for_chatbot = {
-                "home_team_name": display_home_name if 'display_home_name' in locals() else placeholder_nodata,
-                "away_team_name": display_away_name if 'display_away_name' in locals() else placeholder_nodata,
-                "league_name": mp_league_name_of if 'mp_league_name_of' in locals() else placeholder_nodata,
-                "home_team_standings": home_team_main_standings if 'home_team_main_standings' in locals() else {},
-                "away_team_standings": away_team_main_standings if 'away_team_main_standings' in locals() else {},
-                "main_match_odds": main_match_odds_data_of if 'main_match_odds_data_of' in locals() else {},
-                "last_home_match": last_home_match_in_league_of if 'last_home_match_in_league_of' in locals() and last_home_match_in_league_of else None,
-                "last_away_match": last_away_match_in_league_of if 'last_away_match_in_league_of' in locals() and last_away_match_in_league_of else None,
-                "h2h_direct_specific_local_res": col_data.get("Res_H2H_V", "N/A"),
-                "h2h_direct_specific_local_ah": col_data.get("AH_H2H_V", "N/A"),
-                "h2h_direct_general_res": col_data.get("Res_H2H_G", "N/A"),
-                "h2h_direct_general_ah": col_data.get("AH_H2H_G", "N/A"),
-                "final_score_if_available": col_data.get("Fin", "?*?"),
-                "current_ah_line": col_data.get("AH_Act", "?"),
-                "current_goals_line": col_data.get("G_i", "?")
-            }
 
             st.markdown("---")
             st.markdown("<h2 class='section-header'>🎯 Análisis Detallado del Partido</h2>", unsafe_allow_html=True)
@@ -811,7 +748,7 @@ def display_other_feature_ui():
                 rival_a_col3_name_display = rival_a_name_orig_col3 if rival_a_name_orig_col3 and rival_a_name_orig_col3 != "N/A" else (rival_a_id_orig_col3 or "Rival A")
                 rival_b_col3_name_display = rival_b_name_orig_col3 if rival_b_name_orig_col3 and rival_b_name_orig_col3 != "N/A" else (rival_b_id_orig_col3 or "Rival B")
                 details_h2h_col3_of = {"status": "error", "resultado": placeholder_nodata}
-                if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of: 
+                if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of:
                     with st.spinner(f"Buscando H2H: {rival_a_col3_name_display} vs {rival_b_col3_name_display}..."):
                         details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_b_id_orig_col3, rival_a_col3_name_display, rival_b_col3_name_display)
                 
@@ -922,13 +859,6 @@ def display_other_feature_ui():
                 info_col2.metric("Liga",col_data["League"], help="Nombre de la liga en la que se juega el partido.")
                 info_col3.metric("ID Partido",col_data["match_id"], help="Identificador único del partido en la plataforma de origen.")
                 st.markdown("</div>", unsafe_allow_html=True)
-
-            # --- Integración del Chatbot ---
-            if 'match_data_for_chatbot' in locals() and match_data_for_chatbot: # Check if data was prepared
-                st.markdown("---") # Add a separator
-                display_chatbot_ui(match_data_for_chatbot)
-            else:
-                st.warning("⚠️ No se pudieron cargar los datos para el chatbot.")
 
             end_time_of = time.time()
             st.sidebar.success(f"🎉 Análisis completado en {end_time_of - start_time_of:.2f} segundos.")
