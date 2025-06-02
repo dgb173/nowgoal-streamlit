@@ -7,3 +7,5 @@ beautifulsoup4
 pandas
 playwright
 chromedriver-py # Opcional, considerar si es necesario para el entorno de despliegue.
+transformers
+torch
