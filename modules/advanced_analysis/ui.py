@@ -34,7 +34,7 @@ from .selenium_manager import (
 # --- Caching Strategy ---
 # Cache data fetching functions
 cached_fetch_soup_requests_of = st.cache_data(ttl=3600)(fetch_soup_requests_of)
-cached_get_team_league_info_from_script_of = st.cache_data(ttl=3600)(get_team_league_info_from_script_of)
+# cached_get_team_league_info_from_script_of removed, will use direct call
 cached_extract_standings_data_from_h2h_page_of = st.cache_data(ttl=3600)(extract_standings_data_from_h2h_page_of)
 cached_get_rival_a_for_original_h2h_of = st.cache_data(ttl=3600)(get_rival_a_for_original_h2h_of)
 cached_get_rival_b_for_original_h2h_of = st.cache_data(ttl=3600)(get_rival_b_for_original_h2h_of)
@@ -225,7 +225,8 @@ def display_other_feature_ui():
             if not soup_main_h2h_page_of:
                 st.error(f"❌ No se pudo obtener la página H2H principal para el ID {main_match_id_to_process_of}. Verifica la conexión o el ID."); st.stop()
 
-            mp_home_id_of, mp_away_id_of, mp_league_id_of, mp_home_name_from_script, mp_away_name_from_script, mp_league_name_of = cached_get_team_league_info_from_script_of(soup_main_h2h_page_of)
+            # Call the original function directly, not the cached version
+            mp_home_id_of, mp_away_id_of, mp_league_id_of, mp_home_name_from_script, mp_away_name_from_script, mp_league_name_of = get_team_league_info_from_script_of(soup_main_h2h_page_of)
             
             with st.spinner("📊 Extrayendo clasificaciones principales de los equipos..."):
                 home_team_main_standings = cached_extract_standings_data_from_h2h_page_of(soup_main_h2h_page_of, mp_home_name_from_script)
