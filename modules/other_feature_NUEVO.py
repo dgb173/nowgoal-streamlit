@@ -419,24 +419,23 @@ def display_chatbot_ui(match_data):
         st.session_state.chatbot_messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
 
-        detailed_prompt = f"Basado en los siguientes datos del partido de fútbol entre {match_data.get('home_team_name', 'Local')} y {match_data.get('away_team_name', 'Visitante')} en la liga {match_data.get('league_name', 'desconocida')}:\n"
-        detailed_prompt += f"- Clasificación Local: {match_data.get('home_team_standings', {})}\n"
-        detailed_prompt += f"- Clasificación Visitante: {match_data.get('away_team_standings', {})}\n"
-        detailed_prompt += f"- Cuotas Principales: {match_data.get('main_match_odds', {})}\n"
-        if match_data.get('last_home_match'):
-            detailed_prompt += f"- Último partido del Local en casa: {match_data['last_home_match']}\n"
-        if match_data.get('last_away_match'):
-            detailed_prompt += f"- Último partido del Visitante fuera: {match_data['last_away_match']}\n"
-        detailed_prompt += f"- H2H (Local en casa): Resultado {match_data.get('h2h_direct_specific_local_res', 'N/A')}, AH {match_data.get('h2h_direct_specific_local_ah', 'N/A')}\n"
-        detailed_prompt += f"- H2H (General): Resultado {match_data.get('h2h_direct_general_res', 'N/A')}, AH {match_data.get('h2h_direct_general_ah', 'N/A')}\n"
-        if match_data.get('final_score_if_available') and match_data['final_score_if_available'] != '?*?':
-           detailed_prompt += f"- Marcador Final (si ya se jugó): {match_data['final_score_if_available']}\n"
-        
-        detailed_prompt += f"\nConsiderando estos datos, responde a la siguiente pregunta del usuario de forma detallada y como un experto en pronósticos deportivos: {prompt}\nRespuesta:"
+        home_rank = match_data.get('home_team_standings', {}).get('ranking', 'N/A')
+        away_rank = match_data.get('away_team_standings', {}).get('ranking', 'N/A')
+        main_ah_line_formatted = format_ah_as_decimal_string_of(match_data.get('main_match_odds', {}).get('ah_linea_raw', '?'))
+
+        detailed_prompt = (
+            f"Datos clave del partido: {match_data.get('home_team_name', 'Local')} vs {match_data.get('away_team_name', 'Visitante')} en la liga {match_data.get('league_name', 'desconocida')}.\n"
+            f"- Ranking Local: {home_rank}\n"
+            f"- Ranking Visitante: {away_rank}\n"
+            f"- Línea AH Principal: {main_ah_line_formatted}\n"
+            f"- Resultado H2H General: {match_data.get('h2h_direct_general_res', 'N/A')}\n"
+            f"Basándote en estos datos clave: Ranking Local, Ranking Visitante, Línea AH Principal, y Resultado H2H General, actúa como un analista deportivo. Redacta un pronóstico de aproximadamente 70 palabras con estilo humano. Pregunta del usuario: {prompt}\n"
+            f"Pronóstico (aprox. 70 palabras):"
+        )
 
         try:
             with st.spinner("🤖 Pensando..."):
-                response = chatbot_pipeline(detailed_prompt, max_length=350, num_return_sequences=1, pad_token_id=chatbot_pipeline.model.config.eos_token_id) 
+                response = chatbot_pipeline(detailed_prompt, max_length=120, num_return_sequences=1, pad_token_id=chatbot_pipeline.model.config.eos_token_id) 
                 assistant_response = response[0]['generated_text'].replace(detailed_prompt, "").strip()
                 if not assistant_response: 
                     assistant_response = "No pude generar una respuesta específica en este momento. Intenta reformular tu pregunta."
