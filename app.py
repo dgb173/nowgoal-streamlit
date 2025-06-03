@@ -1,6 +1,6 @@
 import streamlit as st
 from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
-from modules.advanced_analysis.ui import display_other_feature_ui # Updated import
+from modules.datos import display_other_feature_ui # Updated import
 
 def main():
     st.set_page_config(
