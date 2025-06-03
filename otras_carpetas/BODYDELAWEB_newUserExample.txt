@@ -1,0 +1,226 @@
+<div class="porletP" id="porletP5">
+    <div>
+        <h2 class="team-table-title">Head to Head Statistics</h2>
+        <table id="table_v3" width="100%" border="0" align="center" cellpadding="0" cellspacing="0" class="team-table-other">
+            <tbody>
+                <tr align="center" class="other-title">
+                    <td colspan="16">
+                        <a onclick="javascript:openFbTeam(10471)" style="cursor:pointer">Redlands United FC</a>
+                        &nbsp;
+                        <input onclick="initMatchListShow(3,1)" type="checkbox" id="cb_sos3"><label style="cursor:pointer" for="cb_sos3">Home</label>&nbsp;&nbsp;
+                        <input onclick="initMatchListShow(3,2)" type="checkbox" id="checkboxleague3" value="1868" name="checkboxleague3">
+                        <label style="cursor: pointer" for="checkboxleague3">Same League</label>
+                        &nbsp;&nbsp;
+                        <input onclick="showOdds_all(3,3)" type="checkbox" id="ftType_3"><label style="cursor:pointer" for="ftType_3">HT</label>&nbsp;&nbsp;
+                        <select id="selectMatchCount3" class="countSelect" onchange="initMatchListShow(3,3)">
+                                <option value="1">Last 1</option>
+                                <option value="2">Last 2</option>
+                                <option value="3" selected="'selected'">Last 3</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr name="vsBarTr">
+                    <td colspan="16">
+                        <div class="x-bar" style="">
+                            <div class="tit">
+                                <span class="win-f left">
+                                    Win <span id="hW_v3">2 (67%)</span>
+                                </span>
+                                <span class="draw-f">
+                                    Draw <span id="d_v3">0 (0%)</span>
+                                </span>
+                                <span class="lose-f right">
+                                    Loss <span id="gW_v3">1 (33%)</span>
+                                </span>
+                            </div>
+                            <div class="bar">
+                                <span style="width: 66.67%;" class="o-win left" id="hWBar_v3"></span>
+                                <span class="o-draw" id="dBar_v3"></span>
+                                <span style="width: 33.33%;" class="o-lose right" id="gWBar_v3"></span>
+                            </div>
+                        </div>
+                        <div class="x-bar" style="">
+                            <div class="tit">
+                                <span class="win-f left">
+                                    <span id="hsAvg_v3">2.7 goals</span>
+                                </span>
+                                <span class="explain">
+                                    Goals Scored/Conceded per Game
+                                </span>
+                                <span class="lose-f right">
+                                    <span id="gsAvg_v3">2.3 goals</span>
+                                </span>
+                            </div>
+                            <div class="bar">
+                                <span class="o-win left" id="hsAvgRate_v3" style="width: 54%;"></span>
+                                <span class="o-lose right" id="gsAvgRate_v3" style="width: 46%;"></span>
+                            </div>
+                        </div>
+                        <ul class="y-bar" style="">
+                            <li class="group">
+                                <div class="tit">Asian Handicap Odds <span id="ahCount_v3">(2 games)</span></div>
+                                <div class="bars">
+                                    <div class="item">
+                                        <div class="o-win bar" id="ahWBar_v3" style="height: 50%;">
+                                            <span class="value win-f">50%</span>
+                                            <span class="txt">Home</span>
+                                        </div>
+                                    </div>
+                                    <div class="item">
+                                        <div class="o-draw bar" id="ahDBar_v3" style="height: 0%;">
+                                            <span class="value draw-f">0%</span>
+                                            <span class="txt">Draw</span>
+                                        </div>
+                                    </div>
+                                    <div class="item">
+                                        <div class="o-lose bar" id="ahLBar_v3" style="height: 50%;">
+                                            <span class="value lose-f">50%</span>
+                                            <span class="txt">Away</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="group">
+                                <div class="tit">Over/Under Odds <span id="ouCount_v3">(2 games)</span></div>
+                                <div class="bars">
+                                    <div class="item">
+                                        <div class="o-win bar" id="ouWBar_v3" style="height: 100%;">
+                                            <span class="value win-f">100%</span>
+                                            <span class="txt">Over</span>
+                                        </div>
+                                    </div>
+                                    <div class="item">
+                                        <div class="o-draw bar" id="ouDBar_v3" style="height: 0%;">
+                                            <span class="value draw-f">0%</span>
+                                            <span class="txt">Draw</span>
+                                        </div>
+                                    </div>
+                                    <div class="item">
+                                        <div class="o-lose bar" id="ouLBar_v3" style="height: 0%;">
+                                            <span class="value lose-f">0%</span>
+                                            <span class="txt">Under</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                    </td>
+                </tr>
+                <tr align="center" name="vsHeadTr">
+                    <th width="70" rowspan="2">League/Cup</th>
+                    <th width="60" rowspan="2">Date </th>
+                    <th width="120" rowspan="2">Home</th>
+                    <th width="55" rowspan="2" id="FScore_3">Score </th>
+                    <th width="120" rowspan="2">Away </th>
+                    <th width="55" rowspan="2" id="FCorner_3">Corner </th>
+                    <th width="144px" colspan="4" class="ll no-b-l">    <select onchange="showOdds_s(3,1);" id="sSelect_3">
+                <option value="281">Bet365</option>
+                <option value="474">Sbobet</option>
+                <option value="18">12Bet</option>
+                <option value="545">Crown</option>
+                <option value="0">1x2</option>
+                <option value="90">Easybet </option>
+                <option value="115">William Hill</option>
+                <option value="80">Macauslot</option>
+                <option value="82">Ladbrokes</option>
+        </select>
+     &nbsp;    <select onchange="showOdds_s(3,2);" id="sType_3">
+                <option value="0">First</option>
+                <option value="1">Final</option>
+        </select>
+     </th>
+                    <th width="144px" colspan="4" class="ll no-b-l">    <select onchange="showOdds_h(3,1);" id="hSelect_3">
+                <option value="8">Bet365</option>
+                <option value="31">Sbobet</option>
+                <option value="24">12bet</option>
+                <option value="3">Crown</option>
+                <option value="12">Easybets</option>
+        </select>
+     &nbsp;    <select onchange="showOdds_h(3,2);" id="hType_3">
+                <option value="0">First</option>
+                <option value="1">Final</option>
+        </select>
+     </th>
+                    <th width="35" class="rl ll" rowspan="2">O/U</th>
+                </tr>
+                <tr align="center" name="vsHeadTr" ahpanlu="" oupanlu="">
+                    <th width="35" class="ll">HW</th>
+                    <th width="35">D</th>
+                    <th width="35">AW</th>
+                    <th width="35">W/L</th>
+                    <th width="35" class="ll">H</th>
+                    <th width="35">AH</th>
+                    <th width="35">A</th>
+                    <th width="35">AH</th>
+                </tr>
+                    <tr id="tr3_1" align="center" style="" vs="0" name="1868" index="2702755" info="1,4,19660,1,2" ahpanlu="2" oupanlu="2">
+                        <td height="25" title="Australia Queensland State Leagues">QLD D1                        </td>
+                        <td>
+                                <span name="timeData" data-t="2025-02-21 10:30:00" data-tf="3">
+            <script language="Javascript" type="text/javascript">formatDate('2025,2-1,21,10,30,00', 3)</script>21-02-2025
+        </span>
+
+                        </td><td><a onclick="soccerDbPage.team(19660)"><span class="">Holland Park Hawks FC</span></a></td>
+                        <td style="cursor: pointer;" onclick="soccerInPage.detail(2702755, 'Holland Park Hawks FC', 'Redlands United FC', 'Australia Queensland State Leagues')"><span class="fscore_3 red2">1-4</span><span class="hscore_3">(1-2)</span></td>
+                        <td><a onclick="soccerDbPage.team(10471)"><span class="team-home-f">Redlands United FC</span></a></td>
+                        <td><span class="fcorner_3">7-12</span><span class="hcorner_3">(3-8)</span></td>
+                        <td class="hbg-td1" name="oddsData" data-o="2.45" data-e="1">2.45</td>
+                        <td class="hbg-td1" name="oddsData" data-o="4.33" data-e="1">4.33</td>
+                        <td class="hbg-td1" name="oddsData" data-o="2.10" data-e="1">2.10</td>
+                        <td class="hbg-td1"><span class="o-win">W</span></td>
+                        <td data-o="0.83">0.83</td>
+                        <td data-o="0/-0.5">0/-0.5</td>
+                        <td data-o="0.98">0.98</td>
+                        <td><span class="o-win">W</span></td>
+                        <td><span class="o-win">O</span></td>
+                    </tr>
+                    <tr id="tr3_2" align="center" style="" vs="0" name="41" index="1211219" info="6,3,19660,4,3" ahpanlu="0" oupanlu="2">
+                        <td height="25" title="International Club Friendly">INT CF                        </td>
+                        <td>
+                                <span name="timeData" data-t="2016-02-03 08:30:00" data-tf="3">
+            <script language="Javascript" type="text/javascript">formatDate('2016,2-1,03,08,30,00', 3)</script>03-02-2016
+        </span>
+
+                        </td><td><a onclick="soccerDbPage.team(19660)"><span class="">Holland Park Hawks FC</span></a></td>
+                        <td style="cursor: pointer;" onclick="soccerInPage.detail(1211219, 'Holland Park Hawks FC', 'Redlands United FC', 'International Club Friendly')"><span class="fscore_3 red2">6-3</span><span class="hscore_3">(4-3)</span></td>
+                        <td><a onclick="soccerDbPage.team(10471)"><span class="team-home-f">Redlands United FC</span></a></td>
+                        <td><span class="fcorner_3">3-3</span><span class="hcorner_3">(3-2)</span></td>
+                        <td class="hbg-td1" name="oddsData"></td>
+                        <td class="hbg-td1" name="oddsData"></td>
+                        <td class="hbg-td1" name="oddsData"></td>
+                        <td class="hbg-td1"><span class="o-lose">L</span></td>
+                        <td data-o="0.82">0.82</td>
+                        <td data-o="0/-0.5">0/-0.5</td>
+                        <td data-o="0.98">0.98</td>
+                        <td><span class="o-lose">L</span></td>
+                        <td><span class="o-win">O</span></td>
+                    </tr>
+                    <tr id="tr3_3" align="center" style="" vs="1" name="41" index="1096324" info="1,0,10471,0,0" ahpanlu="" oupanlu="">
+                        <td height="25" title="International Club Friendly">INT CF                        </td>
+                        <td>
+                                <span name="timeData" data-t="2015-02-14 06:00:00" data-tf="3">
+            <script language="Javascript" type="text/javascript">formatDate('2015,2-1,14,06,00,00', 3)</script>14-02-2015
+        </span>
+
+                        </td><td><a onclick="soccerDbPage.team(10471)"><span class="team-home-f">Redlands United FC</span></a></td>
+                        <td style="cursor: pointer;" onclick="soccerInPage.detail(1096324, 'Redlands United FC', 'Holland Park Hawks FC', 'International Club Friendly')"><span class="fscore_3 red2">1-0</span><span class="hscore_3">(0-0)</span></td>
+                        <td><a onclick="soccerDbPage.team(19660)"><span class="">Holland Park Hawks FC</span></a></td>
+                        <td><span class="fcorner_3">-</span><span class="hcorner_3"></span></td>
+                        <td class="hbg-td1" name="oddsData"></td>
+                        <td class="hbg-td1" name="oddsData"></td>
+                        <td class="hbg-td1" name="oddsData"></td>
+                        <td class="hbg-td1">                <span class="o-win">W</span>
+</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                <tr name="nodataTr" style="display:none;">
+                    <td colspan="16" style="line-height:70px;font-weight:bold;">No Data!</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

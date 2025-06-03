@@ -317,7 +317,7 @@ def extraer_handicaps_h2h(html_content):
 if __name__ == "__main__":
     # This assumes the script is run from the 'funciones' directory.
     # Adjust path if running from repository root or elsewhere for testing.
-    html_example_path = "../otras_carpetas/BODYDELAWEB.txt"
+    html_example_path = "../otras_carpetas/BODYDELAWEB_newUserExample.txt"
 
     # For local testing, you might need to ensure BeautifulSoup is available here
     # if not already imported globally in the file.
