@@ -231,7 +231,7 @@ def click_element_robust_of(driver, by, value, timeout=7):
     except Exception: return False
 
 def extract_last_match_in_league_of(driver, table_css_id_str, main_team_name_in_table, league_id_filter_value, home_or_away_filter_css_selector, is_home_game_filter):
-    except Exception: return None
+    pass
 
 def get_main_match_odds_selenium_of(driver):
     return odds_info
@@ -247,3 +247,103 @@ def extract_h2h_data_of(soup, main_home_team_name, main_away_team_name, current_
 
 def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_search, team_name_to_find_match_for, opponent_name_to_search, current_league_id, is_home_table):
     return "-"
+
+def extraer_handicaps_h2h(html_content):
+    """
+    Extrae los datos de handicap H2H de la tabla v3 en el HTML proporcionado.
+
+    Busca la primera fila con vs="1" para "Local en Casa" y la primera con vs="0" para "General".
+    Extrae las probabilidades de Asian Handicap (H, AH, A) y el resultado del AH.
+    "AH Actual Partido" es un valor fijo de "-1.5".
+    """
+    data = {
+        "AH H2H (Local en Casa)": "N/A",
+        "Res H2H (Local en Casa)": "N/A",
+        "AH Actual Partido": "-1.5",  # Valor fijo según la descripción del issue
+        "AH H2H (General)": "N/A",
+        "Res H2H (General)": "N/A"
+    }
+
+    if not html_content:
+        return data
+
+    soup = BeautifulSoup(html_content, "html.parser")
+    table_v3 = soup.find("table", id="table_v3")
+
+    if not table_v3:
+        return data
+
+    found_local_en_casa = False
+    found_general = False
+
+    rows = table_v3.find_all("tr", id=lambda x: x and x.startswith("tr3_"))
+
+    for row in rows:
+        if found_local_en_casa and found_general:
+            break
+
+        vs_attr = row.get("vs")
+
+        tds = row.find_all("td")
+        if len(tds) < 14: # Need at least 14 cells for indices 10, 11, 12, 13
+            continue
+
+        # Common extraction logic for AH values
+        def get_value(cell_index, cell_list):
+            raw_val = cell_list[cell_index].get("data-o")
+            if raw_val is None or raw_val.strip() == "" or raw_val.strip() == "-":
+                text_val = cell_list[cell_index].text.strip()
+                return text_val if text_val and text_val != "-" else "N/A"
+            return raw_val.strip()
+
+        ah_h = get_value(10, tds)
+        ah_line = get_value(11, tds)
+        ah_a = get_value(12, tds)
+
+        res_ah_span = tds[13].find("span")
+        res_ah = res_ah_span.text.strip() if res_ah_span and res_ah_span.text.strip() and res_ah_span.text.strip() != "-" else "N/A"
+
+        if vs_attr == "1" and not found_local_en_casa:
+            data["AH H2H (Local en Casa)"] = f"{ah_h} / {ah_line} / {ah_a}"
+            data["Res H2H (Local en Casa)"] = res_ah
+            found_local_en_casa = True
+        elif vs_attr == "0" and not found_general:
+            data["AH H2H (General)"] = f"{ah_h} / {ah_line} / {ah_a}"
+            data["Res H2H (General)"] = res_ah
+            found_general = True
+
+    return data
+
+if __name__ == "__main__":
+    # This assumes the script is run from the 'funciones' directory.
+    # Adjust path if running from repository root or elsewhere for testing.
+    html_example_path = "../otras_carpetas/BODYDELAWEB.txt"
+
+    # For local testing, you might need to ensure BeautifulSoup is available here
+    # if not already imported globally in the file.
+    # from bs4 import BeautifulSoup # Already imported at module level
+
+    print(f"Attempting to load HTML from: {html_example_path}")
+    try:
+        with open(html_example_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        print("HTML content loaded successfully.")
+
+        # Ensure the function `extraer_handicaps_h2h` is defined before this block
+        # or imported if it's in another file.
+        print("Calling extraer_handicaps_h2h...")
+        extracted_data = extraer_handicaps_h2h(content)
+
+        # Import json for pretty printing the dictionary
+        import json
+        print("\nExtracted Data:")
+        print(json.dumps(extracted_data, indent=4, ensure_ascii=False))
+        print("\nScript execution finished.")
+
+    except FileNotFoundError:
+        print(f"Error: File not found at {html_example_path}. Please ensure the path is correct.")
+        print("If running from repository root, path might be 'otras_carpetas/BODYDELAWEB.txt'")
+    except NameError as ne:
+        print(f"NameError: {ne}. Ensure 'extraer_handicaps_h2h' is defined or imported.")
+    except Exception as e:
+        print(f"An error occurred during the test execution: {e}")
