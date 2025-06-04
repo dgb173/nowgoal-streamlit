@@ -514,13 +514,15 @@ def display_nowgoal_scraper_ui(): # COPIADA Y ADAPTADA
             try: _ = driver.current_url # Ping
             except WebDriverException: driver_needs_init = True
         
-        if driver_needs_init:
-            if driver: try: driver.quit()
-            except: pass
+               if driver_needs_init_flag: # Asegúrate de que esta es la variable correcta que usaste
+            if current_driver: # Usa la variable correcta para el driver
+                try:
+                    current_driver.quit()
+                except:
+                    pass
             with st.spinner("WebDriver inicializando..."):
-                driver = get_selenium_driver_cached()
-            st.session_state.selenium_driver_instance = driver
-        if not driver: st.error("Driver no disponible."); st.stop()
+                current_driver = get_selenium_driver_cached() # Usa la variable correcta para el driver
+            st.session_state.selenium_driver_instance = current_driver # Actualiza el estado de la sesión
 
 
         # --- Expansores para cada sección ---
