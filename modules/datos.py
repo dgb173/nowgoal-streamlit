@@ -1,5 +1,5 @@
+# modules/other_feature_NUEVO.py
 
-# modules/other_feature_NUEVO.py (o como lo llames)
 import streamlit as st
 import time
 import requests
@@ -8,6 +8,9 @@ import math
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+# IMPORTAR LA FUNCIÓN PARA LAS ESTADÍSTICAS DETALLADAS DE PARTIDO
+from modules.match_stats_extractor import _get_match_stats_data 
 
 # Importaciones de Selenium
 from selenium import webdriver
@@ -22,7 +25,7 @@ BASE_URL_OF = "https://live18.nowgoal25.com" # Verifica que este sea el dominio 
 SELENIUM_TIMEOUT_SECONDS_OF = 20
 SELENIUM_POLL_FREQUENCY_OF = 0.2
 
-# --- FUNCIONES HELPER PARA PARSEO Y FORMATEO (ADAPTADAS) ---
+# --- FUNCIONES HELPER PARA PARSEO Y FORMATEO (ADAPTADAS Y MODIFICADAS) ---
 def parse_ah_to_number_of(ah_line_str: str):
     if not isinstance(ah_line_str, str): return None
     s = ah_line_str.strip().replace(' ', '')
@@ -37,12 +40,11 @@ def parse_ah_to_number_of(ah_line_str: str):
             except ValueError: return None
             try: val2 = float(p2_str)
             except ValueError: return None
-            # Lógica para manejar signos correctamente en formatos como "-0/0.5" o "0/-0.5"
-            if val1 < 0 and not p2_str.startswith('-') and val2 > 0: # ej: -0.5/1
-                 val2 = -abs(val2) # Implícito -0.5 / -1, pero raro; más común es -0.5/-1
+            if val1 < 0 and not p2_str.startswith('-') and val2 > 0:
+                 val2 = -abs(val2)
             elif original_starts_with_minus and val1 == 0.0 and \
                  (p1_str == "0" or p1_str == "-0") and \
-                 not p2_str.startswith('-') and val2 > 0: # ej: -0/0.5 (debe ser 0 y -0.5)
+                 not p2_str.startswith('-') and val2 > 0:
                 val2 = -abs(val2)
             return (val1 + val2) / 2.0
         else: # Formatos como "0.5", "-1"
@@ -51,12 +53,11 @@ def parse_ah_to_number_of(ah_line_str: str):
         return None
 
 def format_ah_as_decimal_string_of(ah_line_str: str, for_sheets=False):
-    # Devuelve el string formateado (ej: "-0.5", "1", "0") o '-' si no es parseable/válido.
     if not isinstance(ah_line_str, str) or not ah_line_str.strip() or ah_line_str.strip() in ['-', '?']:
         return ah_line_str.strip() if isinstance(ah_line_str, str) and ah_line_str.strip() in ['-','?'] else '-'
     
     numeric_value = parse_ah_to_number_of(ah_line_str)
-    if numeric_value is None: # No se pudo parsear a número
+    if numeric_value is None:
         return ah_line_str.strip() if ah_line_str.strip() in ['-','?'] else '-'
 
     if numeric_value == 0.0:
@@ -88,6 +89,7 @@ def format_ah_as_decimal_string_of(ah_line_str: str, for_sheets=False):
         return "'" + output_str.replace('.', ',') if output_str not in ['-','?'] else output_str
     return output_str
 
+# MODIFICADA: Ahora devuelve el 'matchIndex' para poder usarlo en las estadísticas detalladas
 def get_match_details_from_row_of(row_element, score_class_selector='score', source_table_type='h2h'):
     try:
         cells = row_element.find_all('td')
@@ -104,10 +106,15 @@ def get_match_details_from_row_of(row_element, score_class_selector='score', sou
         ah_line_raw_text = cells[ah_idx].text.strip()
         ah_line_fmt = format_ah_as_decimal_string_of(ah_line_raw_text) 
         if not home or not away: return None
+        
+        # AÑADIDO: Extraer el matchIndex
+        match_id_for_stats = row_element.get('index') 
+
         return {'home': home, 'away': away, 'score': score_fmt, 'score_raw': score_raw,
                 'ahLine': ah_line_fmt, 'ahLine_raw': ah_line_raw_text,
                 'matchIndex': row_element.get('index'), 'vs': row_element.get('vs'),
-                'league_id_hist': league_id_hist_attr}
+                'league_id_hist': league_id_hist_attr, 
+                'match_id_for_stats': match_id_for_stats} # <--- MODIFICADO: AÑADIDO match_id_for_stats
     except Exception: return None
 
 @st.cache_resource
@@ -174,6 +181,7 @@ def get_selenium_driver_of():
     try: return webdriver.Chrome(options=options)
     except WebDriverException as e: st.error(f"Error inicializando Selenium driver (OF): {e}"); return None
 
+# MODIFICADA: Ahora devuelve el 'match_id_for_stats'
 def get_h2h_details_for_original_logic_of(driver_instance, key_match_id_for_h2h_url, rival_a_id, rival_b_id, rival_a_name="Rival A", rival_b_name="Rival B"):
     if not driver_instance: return {"status": "error", "resultado": "N/A (Driver no disponible H2H OF)"}
     if not key_match_id_for_h2h_url or not rival_a_id or not rival_b_id: return {"status": "error", "resultado": f"N/A (IDs incompletos para H2H {rival_a_name} vs {rival_b_name})"}
@@ -202,8 +210,15 @@ def get_h2h_details_for_original_logic_of(driver_instance, key_match_id_for_h2h_
                 cell = tds[HANDICAP_TD_IDX]; d_o = cell.get("data-o") 
                 handicap_raw = d_o.strip() if d_o and d_o.strip() not in ["", "-"] else (cell.text.strip() if cell.text.strip() not in ["", "-"] else "N/A")
             rol_a_in_this_h2h = "H" if h2h_row_home_id == str(rival_a_id) else "A"
-            return {"status": "found", "goles_home": g_h.strip(), "goles_away": g_a.strip(), "handicap": handicap_raw, "rol_rival_a": rol_a_in_this_h2h, "h2h_home_team_name": links[0].text.strip(), "h2h_away_team_name": links[1].text.strip()}
-    return {"status": "not_found", "resultado": f"H2H directo no encontrado para {rival_a_name} vs {rival_b_name} en historial (table_v2) de la página de ref. ({key_match_id_for_h2h_url})."}
+            
+            # AÑADIDO: match_id_for_stats
+            match_id_for_stats = row.get("index") 
+
+            return {"status": "found", "goles_home": g_h.strip(), "goles_away": g_a.strip(), "handicap": handicap_raw, 
+                    "rol_rival_a": rol_a_in_this_h2h, "h2h_home_team_name": links[0].text.strip(), 
+                    "h2h_away_team_name": links[1].text.strip(), 
+                    "match_id_for_stats": match_id_for_stats} # <--- MODIFICADO
+    return {"status": "not_found", "resultado": f"H2H directo no encontrado para {rival_a_name} vs {rival_b_name} en historial (table_v2) de la página de ref. ({key_match_id_for_h2h_url}).", "match_id_for_stats": None}
 
 def get_team_league_info_from_script_of(soup):
     home_id, away_id, league_id, home_name, away_name, league_name = (None,)*3 + ("N/A",)*3
@@ -231,6 +246,7 @@ def click_element_robust_of(driver, by, value, timeout=7):
         return True
     except Exception: return False
 
+# MODIFICADA: Ahora devuelve el 'match_id_for_stats'
 def extract_last_match_in_league_of(driver, table_css_id_str, main_team_name_in_table, league_id_filter_value, home_or_away_filter_css_selector, is_home_game_filter):
     try:
         if league_id_filter_value:
@@ -259,7 +275,13 @@ def extract_last_match_in_league_of(driver, table_css_id_str, main_team_name_in_
                 handicap_cell = tds[11]; handicap_raw = handicap_cell.get("data-o", handicap_cell.text.strip()) 
                 if not handicap_raw or handicap_raw.strip() == "-": handicap_raw = "N/A"
                 else: handicap_raw = handicap_raw.strip()
-                return {"date": date, "home_team": home_team_row_name, "away_team": away_team_row_name,"score": score, "handicap_line_raw": handicap_raw}
+                
+                # AÑADIDO: match_id_for_stats
+                match_id_for_stats = row.get("index")
+
+                return {"date": date, "home_team": home_team_row_name, "away_team": away_team_row_name,
+                        "score": score, "handicap_line_raw": handicap_raw, 
+                        "match_id_for_stats": match_id_for_stats} # <--- MODIFICADO
         return None
     except Exception: return None
 
@@ -346,24 +368,28 @@ def extract_final_score_of(soup):
     except Exception: pass
     return '?*?', "?-?"
 
+# MODIFICADA: Ahora devuelve también los IDs de los partidos H2H encontrados
 def extract_h2h_data_of(soup, main_home_team_name, main_away_team_name, current_league_id):
-    ah1, res1, res1_raw = '-', '?*?', '?-?'; ah6, res6, res6_raw = '-', '?*?', '?-?'
+    ah1, res1, res1_raw, h2h1_match_id = '-', '?*?', '?-?', None
+    ah6, res6, res6_raw, h2h6_match_id = '-', '?*?', '?-?', None
     h2h_table = soup.find("table", id="table_v3")
-    if not h2h_table: return ah1, res1, res1_raw, ah6, res6, res6_raw
+    if not h2h_table: return ah1, res1, res1_raw, h2h1_match_id, ah6, res6, res6_raw, h2h6_match_id
     filtered_h2h_list = []
     if not main_home_team_name or not main_away_team_name:
-        return ah1, res1, res1_raw, ah6, res6, res6_raw
+        return ah1, res1, res1_raw, h2h1_match_id, ah6, res6, res6_raw, h2h6_match_id
 
     for row_h2h in h2h_table.find_all("tr", id=re.compile(r"tr3_\d+")):
+        # get_match_details_from_row_of ahora devuelve match_id_for_stats
         details = get_match_details_from_row_of(row_h2h, score_class_selector='fscore_3', source_table_type='h2h')
         if not details: continue
         if current_league_id and details.get('league_id_hist') and details.get('league_id_hist') != str(current_league_id): continue
         filtered_h2h_list.append(details)
-    if not filtered_h2h_list: return ah1, res1, res1_raw, ah6, res6, res6_raw
+    if not filtered_h2h_list: return ah1, res1, res1_raw, h2h1_match_id, ah6, res6, res6_raw, h2h6_match_id
     
     h2h_general_match = filtered_h2h_list[0]
     ah6 = h2h_general_match.get('ahLine', '-') 
     res6 = h2h_general_match.get('score', '?*?'); res6_raw = h2h_general_match.get('score_raw', '?-?')
+    h2h6_match_id = h2h_general_match.get('match_id_for_stats') # <--- AÑADIDO: ID para el H2H general
     
     h2h_local_specific_match = None
     for d_h2h in filtered_h2h_list:
@@ -373,15 +399,18 @@ def extract_h2h_data_of(soup, main_home_team_name, main_away_team_name, current_
     if h2h_local_specific_match:
         ah1 = h2h_local_specific_match.get('ahLine', '-') 
         res1 = h2h_local_specific_match.get('score', '?*?'); res1_raw = h2h_local_specific_match.get('score_raw', '?-?')
-    return ah1, res1, res1_raw, ah6, res6, res6_raw
+        h2h1_match_id = h2h_local_specific_match.get('match_id_for_stats') # <--- AÑADIDO: ID para el H2H específico
+    
+    return ah1, res1, res1_raw, h2h1_match_id, ah6, res6, res6_raw, h2h6_match_id # <--- MODIFICADO
 
 def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_search, team_name_to_find_match_for, opponent_name_to_search, current_league_id, is_home_table):
     if not opponent_name_to_search or opponent_name_to_search == "N/A" or not team_name_to_find_match_for:
-        return "-"
+        return "-", None # <--- MODIFICADO: Añadido retorno para match_id
     table = soup_for_team_history.find("table", id=table_id_of_team_to_search)
-    if not table: return "-"
+    if not table: return "-", None # <--- MODIFICADO
     score_class_selector = 'fscore_1' if is_home_table else 'fscore_2'
     for row in table.find_all("tr", id=re.compile(rf"tr{table_id_of_team_to_search[-1]}_\d+")):
+        # get_match_details_from_row_of ahora devuelve match_id_for_stats
         details = get_match_details_from_row_of(row, score_class_selector=score_class_selector, source_table_type='hist')
         if not details: continue
         if current_league_id and details.get('league_id_hist') and details.get('league_id_hist') != str(current_league_id): continue
@@ -392,8 +421,9 @@ def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_sear
             score = details.get('score', '?*?')
             ah_line_extracted = details.get('ahLine', '-')
             localia = 'H' if team_main_lower == home_hist else 'A'
-            return f"{score}/{ah_line_extracted} {localia}".strip()
-    return "-"
+            match_id_for_stats = details.get('match_id_for_stats') # <--- AÑADIDO: Obtener el ID del partido comparado
+            return f"{score}/{ah_line_extracted} {localia}".strip(), match_id_for_stats # <--- MODIFICADO: Retorna ID
+    return "-", None # <--- MODIFICADO
 
 # --- STREAMLIT APP UI (Función principal) ---
 def display_other_feature_ui():
@@ -609,6 +639,10 @@ def display_other_feature_ui():
                     if soup_rival_b_h2h_page: rival_b_standings = extract_standings_data_from_h2h_page_of(soup_rival_b_h2h_page, rival_b_name_orig_col3)
             
             main_match_odds_data_of = {}; last_home_match_in_league_of = None; last_away_match_in_league_of = None
+            h2h_col3_extra_stats_df = None # Nuevo para las stats del H2H de Col3
+            h2h1_extra_stats_df = None # Nuevo para las stats del H2H V
+            h2h6_extra_stats_df = None # Nuevo para las stats del H2H G
+            
             driver_actual_of = st.session_state.driver_other_feature; driver_of_needs_init = False
             if driver_actual_of is None: driver_of_needs_init = True
             else:
@@ -625,17 +659,36 @@ def display_other_feature_ui():
 
             if driver_actual_of:
                 try:
-                    with st.spinner("⚙️ Accediendo a datos dinámicos con Selenium (cuotas, últimos partidos)..."):
+                    with st.spinner("⚙️ Accediendo a datos dinámicos con Selenium (cuotas, últimos partidos, stats detalladas)..."):
                         driver_actual_of.get(f"{BASE_URL_OF}{main_page_url_h2h_view_of}") 
                         WebDriverWait(driver_actual_of, SELENIUM_TIMEOUT_SECONDS_OF).until(EC.presence_of_element_located((By.ID, "table_v1"))) 
                         time.sleep(0.8) # Pequeña pausa para asegurar carga completa de JS
                         main_match_odds_data_of = get_main_match_odds_selenium_of(driver_actual_of)
+                        
                         if mp_home_id_of and mp_league_id_of and display_home_name and display_home_name != "N/A":
                              last_home_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v1", display_home_name, mp_league_id_of, "input#cb_sos1[value='1']", is_home_game_filter=True)
+                             if last_home_match_in_league_of and last_home_match_in_league_of.get('match_id_for_stats'):
+                                 last_home_match_in_league_of['extra_stats'] = _get_match_stats_data(last_home_match_in_league_of['match_id_for_stats'])
+                             else:
+                                 last_home_match_in_league_of['extra_stats'] = pd.DataFrame() # DataFrame vacío
                         if mp_away_id_of and mp_league_id_of and display_away_name and display_away_name != "N/A":
                             last_away_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v2", display_away_name, mp_league_id_of, "input#cb_sos2[value='2']", is_home_game_filter=False)
+                            if last_away_match_in_league_of and last_away_match_in_league_of.get('match_id_for_stats'):
+                                last_away_match_in_league_of['extra_stats'] = _get_match_stats_data(last_away_match_in_league_of['match_id_for_stats'])
+                            else:
+                                last_away_match_in_league_of['extra_stats'] = pd.DataFrame() # DataFrame vacío
+
+                        # H2H Rivales (Col3)
+                        details_h2h_col3_of = {"status": "error", "resultado": placeholder_nodata, "match_id_for_stats": None}
+                        if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of: 
+                            details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_b_id_orig_col3, rival_a_col3_name_display, rival_b_col3_name_display)
+                            if details_h2h_col3_of.get("status") == "found" and details_h2h_col3_of.get('match_id_for_stats'):
+                                h2h_col3_extra_stats_df = _get_match_stats_data(details_h2h_col3_of['match_id_for_stats'])
+                            else:
+                                h2h_col3_extra_stats_df = pd.DataFrame()
+
                 except Exception as e_main_sel_of: st.error(f"❗ Error durante la extracción con Selenium: {type(e_main_sel_of).__name__}. Algunos datos podrían faltar.")
-            else: st.warning("❗ WebDriver no disponible. No se podrán obtener cuotas iniciales ni últimos partidos filtrados por liga/localía.")
+            else: st.warning("❗ WebDriver no disponible. No se podrán obtener cuotas iniciales ni últimos partidos filtrados por liga/localía ni estadísticas detalladas de esos partidos.")
 
             # --- Población de col_data ---
             col_data = { 
@@ -666,17 +719,34 @@ def display_other_feature_ui():
                 col_data["AH_V_A"] = format_ah_as_decimal_string_of(last_away_match_in_league_of.get('handicap_line_raw', '-'))
                 col_data["Res_V_A"] = last_away_match_in_league_of.get('score', '?*?').replace('-', '*')
             
-            ah1_val, res1_val, _, ah6_val, res6_val, _ = extract_h2h_data_of(soup_main_h2h_page_of, display_home_name, display_away_name, mp_league_id_of)
+            # Recuperamos los IDs de los partidos H2H
+            ah1_val, res1_val, _, h2h1_match_id, ah6_val, res6_val, _, h2h6_match_id = extract_h2h_data_of(soup_main_h2h_page_of, display_home_name, display_away_name, mp_league_id_of)
             col_data["AH_H2H_V"] = ah1_val; col_data["Res_H2H_V"] = res1_val
             col_data["AH_H2H_G"] = ah6_val; col_data["Res_H2H_G"] = res6_val
-            
+
+            # Obtener estadísticas detalladas para los H2H directos
+            if h2h1_match_id:
+                h2h1_extra_stats_df = _get_match_stats_data(h2h1_match_id)
+            if h2h6_match_id:
+                h2h6_extra_stats_df = _get_match_stats_data(h2h6_match_id)
+
             last_away_opponent_for_home_hist = last_away_match_in_league_of.get('home_team') if last_away_match_in_league_of and display_home_name else None
+            comp_str_l_val, comp_str_l_id = "-", None
             if last_away_opponent_for_home_hist and display_home_name != "N/A":
-                col_data["L_vs_UV_A"] = extract_comparative_match_of(soup_main_h2h_page_of, "table_v1", display_home_name, last_away_opponent_for_home_hist, mp_league_id_of, is_home_table=True)
+                comp_str_l_val, comp_str_l_id = extract_comparative_match_of(soup_main_h2h_page_of, "table_v1", display_home_name, last_away_opponent_for_home_hist, mp_league_id_of, is_home_table=True)
+            col_data["L_vs_UV_A"] = comp_str_l_val
+            comp_l_extra_stats_df = None
+            if comp_str_l_id:
+                comp_l_extra_stats_df = _get_match_stats_data(comp_str_l_id)
             
             last_home_opponent_for_away_hist = last_home_match_in_league_of.get('away_team') if last_home_match_in_league_of and display_away_name else None
+            comp_str_v_val, comp_str_v_id = "-", None
             if last_home_opponent_for_away_hist and display_away_name != "N/A":
-                col_data["V_vs_UL_H"] = extract_comparative_match_of(soup_main_h2h_page_of, "table_v2", display_away_name, last_home_opponent_for_away_hist, mp_league_id_of, is_home_table=False)
+                comp_str_v_val, comp_str_v_id = extract_comparative_match_of(soup_main_h2h_page_of, "table_v2", display_away_name, last_home_opponent_for_away_hist, mp_league_id_of, is_home_table=False)
+            col_data["V_vs_UL_H"] = comp_str_v_val
+            comp_v_extra_stats_df = None
+            if comp_str_v_id:
+                comp_v_extra_stats_df = _get_match_stats_data(comp_str_v_id)
             # --- Fin población col_data ---
 
             st.markdown("---")
@@ -721,6 +791,12 @@ def display_other_feature_ui():
                     st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah if formatted_ah != '-' else placeholder_nodata}</span>", unsafe_allow_html=True)
                     st.caption(f"📅 {res['date']}")
                     st.caption("Último partido del equipo local jugado en casa en esta misma liga.")
+                    # AÑADIDO: Mostrar estadísticas detalladas
+                    if res.get('extra_stats') is not None and not res['extra_stats'].empty:
+                        st.markdown("<h5 class='card-subtitle'>Estadísticas de Ataque</h5>", unsafe_allow_html=True)
+                        st.dataframe(res['extra_stats'].set_index('Estadística'), use_container_width=True)
+                    else:
+                        st.info("Estadísticas de ataque no disponibles para este partido.")
                 else: st.info(f"No se encontró último partido en casa para {display_home_name or 'Local'} en esta liga.")
                 st.markdown("</div>", unsafe_allow_html=True)
             with rp_col2:
@@ -734,6 +810,12 @@ def display_other_feature_ui():
                     st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah if formatted_ah != '-' else placeholder_nodata}</span>", unsafe_allow_html=True)
                     st.caption(f"📅 {res['date']}")
                     st.caption("Último partido del equipo visitante jugado fuera en esta misma liga.")
+                    # AÑADIDO: Mostrar estadísticas detalladas
+                    if res.get('extra_stats') is not None and not res['extra_stats'].empty:
+                        st.markdown("<h5 class='card-subtitle'>Estadísticas de Ataque</h5>", unsafe_allow_html=True)
+                        st.dataframe(res['extra_stats'].set_index('Estadística'), use_container_width=True)
+                    else:
+                        st.info("Estadísticas de ataque no disponibles para este partido.")
                 else: st.info(f"No se encontró último partido fuera para {display_away_name or 'Visitante'} en esta liga.")
                 st.markdown("</div>", unsafe_allow_html=True)
             with rp_col3:
@@ -741,11 +823,8 @@ def display_other_feature_ui():
                 st.markdown(f"<h4 class='card-title'>🆚 H2H Rivales (Col3)</h4>", unsafe_allow_html=True)
                 rival_a_col3_name_display = rival_a_name_orig_col3 if rival_a_name_orig_col3 and rival_a_name_orig_col3 != "N/A" else (rival_a_id_orig_col3 or "Rival A")
                 rival_b_col3_name_display = rival_b_name_orig_col3 if rival_b_name_orig_col3 and rival_b_name_orig_col3 != "N/A" else (rival_b_id_orig_col3 or "Rival B")
-                details_h2h_col3_of = {"status": "error", "resultado": placeholder_nodata}
-                if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of: 
-                    with st.spinner(f"Buscando H2H: {rival_a_col3_name_display} vs {rival_b_col3_name_display}..."):
-                        details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_b_id_orig_col3, rival_a_col3_name_display, rival_b_col3_name_display)
                 
+                # detalles_h2h_col3_of ya se obtuvo y si se pudo, h2h_col3_extra_stats_df también
                 if details_h2h_col3_of.get("status") == "found":
                     res_h2h = details_h2h_col3_of
                     h2h_home_name = res_h2h.get('h2h_home_team_name', 'Equipo Local H2H')
@@ -754,6 +833,12 @@ def display_other_feature_ui():
                     formatted_ah_h2h = format_ah_as_decimal_string_of(res_h2h.get('handicap','-'))
                     st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_h2h if formatted_ah_h2h != '-' else placeholder_nodata}</span>", unsafe_allow_html=True)
                     st.caption(f"Enfrentamiento directo entre <span class='home-color'>{rival_a_col3_name_display}</span> y <span class='away-color'>{rival_b_col3_name_display}</span>.", unsafe_allow_html=True)
+                    # AÑADIDO: Mostrar estadísticas detalladas
+                    if h2h_col3_extra_stats_df is not None and not h2h_col3_extra_stats_df.empty:
+                        st.markdown("<h5 class='card-subtitle'>Estadísticas de Ataque</h5>", unsafe_allow_html=True)
+                        st.dataframe(h2h_col3_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                    else:
+                        st.info("Estadísticas de ataque no disponibles para este partido.")
                 else: st.info(details_h2h_col3_of.get('resultado', f"H2H entre {rival_a_col3_name_display} y {rival_b_col3_name_display} no encontrado."))
                 st.markdown("</div>", unsafe_allow_html=True)
             
@@ -788,10 +873,23 @@ def display_other_feature_ui():
                 h2h_cols2.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":"), help="Resultado del último H2H con el equipo local actual jugando en casa.")
                 h2h_cols3.metric("AH Actual Partido", col_data["AH_Act"], help="Hándicap Asiático inicial (Bet365) para este partido.")
 
+                # AÑADIDO: Estadísticas detalladas para H2H (Local en Casa)
+                if h2h1_extra_stats_df is not None and not h2h1_extra_stats_df.empty:
+                    st.markdown("<h5 class='card-subtitle'>Estadísticas de Ataque (H2H Específico)</h5>", unsafe_allow_html=True)
+                    st.dataframe(h2h1_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                else:
+                    st.info("Estadísticas de ataque no disponibles para este H2H específico.")
+
                 h2h_g_cols1, h2h_g_cols2 = st.columns(2)
                 h2h_g_cols1.metric("AH H2H (General)", col_data["AH_H2H_G"], help="Hándicap Asiático del H2H más reciente entre ambos equipos, sin importar localía.")
                 h2h_g_cols2.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":"), help="Resultado del H2H más reciente entre ambos equipos.")
                 
+                # AÑADIDO: Estadísticas detalladas para H2H (General)
+                if h2h6_extra_stats_df is not None and not h2h6_extra_stats_df.empty:
+                    st.markdown("<h5 class='card-subtitle'>Estadísticas de Ataque (H2H General)</h5>", unsafe_allow_html=True)
+                    st.dataframe(h2h6_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                else:
+                    st.info("Estadísticas de ataque no disponibles para este H2H general.")
                
             
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True):
@@ -812,6 +910,12 @@ def display_other_feature_ui():
                         st.markdown(f"⚽ **Resultado:** <span class='data-highlight'>{score_part if score_part else placeholder_nodata}</span>", unsafe_allow_html=True, help="Resultado del partido entre el Local y el último rival del Visitante.")
                         st.markdown(f"⚖️ **AH (Partido Comparado):** <span class='ah-value'>{format_ah_as_decimal_string_of(ah_val_l) if ah_val_l else placeholder_nodata}</span>", unsafe_allow_html=True, help="Hándicap de ese partido comparado.")
                         st.markdown(f"🏟️ **Localía de '{display_home_name or 'Local'}':** <span class='data-highlight'>{loc_val_l if loc_val_l else placeholder_nodata}</span>", unsafe_allow_html=True, help=f"Indica si '{display_home_name or 'Local'}' fue local (H) o visitante (A) en ese partido específico.")
+                        # AÑADIDO: Mostrar estadísticas detalladas
+                        if comp_l_extra_stats_df is not None and not comp_l_extra_stats_df.empty:
+                            st.markdown("<h5 class='card-subtitle'>Estadísticas de Ataque</h5>", unsafe_allow_html=True)
+                            st.dataframe(comp_l_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                        else:
+                            st.info("Estadísticas de ataque no disponibles para este partido comparado.")
                     else:
                         st.info("Comparativa L vs UV A no disponible.")
 
@@ -829,6 +933,12 @@ def display_other_feature_ui():
                         st.markdown(f"⚽ **Resultado:** <span class='data-highlight'>{score_part if score_part else placeholder_nodata}</span>", unsafe_allow_html=True, help="Resultado del partido entre el Visitante y el último rival del Local.")
                         st.markdown(f"⚖️ **AH (Partido Comparado):** <span class='ah-value'>{format_ah_as_decimal_string_of(ah_val_v) if ah_val_v else placeholder_nodata}</span>", unsafe_allow_html=True, help="Hándicap de ese partido comparado.")
                         st.markdown(f"🏟️ **Localía de '{display_away_name or 'Visitante'}':** <span class='data-highlight'>{loc_val_v if loc_val_v else placeholder_nodata}</span>", unsafe_allow_html=True, help=f"Indica si '{display_away_name or 'Visitante'}' fue local (H) o visitante (A) en ese partido específico.")
+                        # AÑADIDO: Mostrar estadísticas detalladas
+                        if comp_v_extra_stats_df is not None and not comp_v_extra_stats_df.empty:
+                            st.markdown("<h5 class='card-subtitle'>Estadísticas de Ataque</h5>", unsafe_allow_html=True)
+                            st.dataframe(comp_v_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                        else:
+                            st.info("Estadísticas de ataque no disponibles para este partido comparado.")
                     else:
                         st.info("Comparativa V vs UL H no disponible.")
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -869,6 +979,7 @@ def display_other_feature_ui():
                 <li>Cuotas iniciales de Bet365.</li>
                 <li>Rendimiento reciente y H2H.</li>
                 <li>Comparativas indirectas y mucho más.</li>
+                <li><strong style='color:#28a745;'>¡NUEVO! Estadísticas de ataque (disparos, ataques peligrosos) para partidos históricos relevantes.</strong></li>
             </ul>
             <p><strong>Simplemente introduce el ID del partido y pulsa analizar.</strong></p>
         </div>
