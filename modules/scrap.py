@@ -35,7 +35,114 @@ def scrape_match_data(url: str):
     # Ruta al ChromeDriver descargado por setup.sh
     # Esto es crucial en Streamlit Cloud si setup.sh lo pone en el raíz.
     webdriver_path = './chromedriver' 
-@@ -143,25 +146,129 @@ def scrape_match_data(url: str):
+    
+    driver = None
+    try:
+        # logger.debug(f"Intentando iniciar ChromeDriver desde: {webdriver_path}")
+        service = Service(executable_path=webdriver_path)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        # logger.debug("WebDriver de Chrome iniciado.")
+
+        driver.get(url)
+        # logger.info(f"Navegación a {url} completada. Esperando por tabla...")
+
+        # Esperar a que la tabla de partidos principal exista
+        WebDriverWait(driver, 60).until(
+            EC.presence_of_element_located((By.ID, "table_live"))
+        )
+        # logger.info("Tabla #table_live encontrada. Esperando por filas de partidos...")
+
+        # Esperar a que al menos una fila de partido (tr.tds[matchid]) esté presente.
+        WebDriverWait(driver, 45).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, '#table_live tr.tds[matchid]'))
+        )
+        # logger.info("Al menos una fila de partido encontrada.")
+        
+        # Dar un pequeño respiro extra para cualquier JS final
+        time.sleep(3) # Puedes ajustar o quitar esto
+
+        match_rows = driver.find_elements(By.CSS_SELECTOR, '#table_live tr.tds[matchid]')
+        # logger.info(f"Encontradas {len(match_rows)} filas de partidos.")
+
+        if not match_rows:
+            # logger.info("No se encontraron filas de partidos con el selector CSS.")
+            return pd.DataFrame()
+
+        for i, row_element in enumerate(match_rows):
+            # logger.debug(f"Procesando fila {i+1}...")
+            match_id = row_element.get_attribute('matchid')
+            if not match_id:
+                # logger.warning(f"Fila {i+1} no tiene matchid, saltando.")
+                continue
+
+            time_val = "N/A"
+            try:
+                time_element_mt = row_element.find_element(By.CSS_SELECTOR, f'td#mt_{match_id}[name="timeData"]')
+                data_t = time_element_mt.get_attribute('data-t')
+                if data_t and ' ' in data_t:
+                    time_val = data_t.split(" ")[1][:5]
+                elif data_t:
+                    time_val = data_t
+                else:
+                    time_val_text_raw = time_element_mt.text
+                    if time_val_text_raw:
+                        time_val_text = time_val_text_raw.strip()
+                        if time_val_text and ":" in time_val_text:
+                             time_val = time_val_text
+            except Exception: #Elemento no encontrado u otro error
+                # logger.debug(f"No se encontró td#mt_{match_id} para la hora. Saltando hora.")
+                pass
+
+            home_team_name = "N/A"
+            try:
+                home_anchor = row_element.find_element(By.CSS_SELECTOR, f'td[id="ht_{match_id}"] > a[id^="team1_"]')
+                home_team_text_full = home_anchor.text
+                if home_team_text_full:
+                    home_team_name = home_team_text_full.split('(N)')[0].strip()
+            except Exception:
+                try: # Fallback selector
+                    home_anchor = row_element.find_element(By.CSS_SELECTOR, f'td[id="ht_{match_id}"] > a:first-of-type')
+                    home_team_text_full = home_anchor.text
+                    if home_team_text_full:
+                        home_team_name = home_team_text_full.split('(N)')[0].strip()
+                except Exception:
+                    # logger.debug(f"No se encontró el nombre del equipo local para match {match_id}")
+                    pass
+
+            away_team_name = "N/A"
+            try:
+                away_anchor = row_element.find_element(By.CSS_SELECTOR, f'td[id="gt_{match_id}"] > a[id^="team2_"]')
+                away_team_text_full = away_anchor.text
+                if away_team_text_full:
+                    away_team_name = away_team_text_full.split('(N)')[0].strip()
+            except Exception:
+                try: # Fallback selector
+                    away_anchor = row_element.find_element(By.CSS_SELECTOR, f'td[id="gt_{match_id}"] > a:first-of-type')
+                    away_team_text_full = away_anchor.text
+                    if away_team_text_full:
+                        away_team_name = away_team_text_full.split('(N)')[0].strip()
+                except Exception:
+                    # logger.debug(f"No se encontró el nombre del equipo visitante para match {match_id}")
+                    pass
+            
+            score = "N/A"
+            try:
+                score_b_element = row_element.find_element(By.CSS_SELECTOR, 'td.blue.handpoint > b')
+                score_text_raw = score_b_element.text
+                if score_text_raw:
+                    score = score_text_raw.strip()
+                    if score == "-": score = "Por Jugar"
+            except Exception:
+                try: # Fallback si no hay <b>
+                    score_td_element = row_element.find_element(By.CSS_SELECTOR, 'td.blue.handpoint')
+                    score_text_raw = score_td_element.text
+                    if score_text_raw:
+                        score = score_text_raw.strip()
+                        if score == "-": score = "Por Jugar"
+                except Exception:
+                    # logger.debug(f"No se encontró el resultado para match {match_id}")
+                    pass
+
             match_list.append({
                 "ID Partido": match_id,
                 "Hora": time_val,
