@@ -1,8 +1,7 @@
 import streamlit as st
 from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
 from modules.datos import display_other_feature_ui
-from modules.scrap import scrap
-
+from modules.match_stats_extractor import display_match_stats_extractor_ui
 
 def main():
     st.set_page_config(
@@ -59,11 +58,8 @@ def main():
         display_other_feature_ui()
     # CORRECCIÓN DE INDENTACIÓN y ahora coincide con el radio button
     elif selected_tool == "3. Scrapear datos": # <--- Debe coincidir exactamente con la opción del radio
-        scrap()
-    # Si tuvieras una opción "3. Información General", necesitarías un elif para ella también.
-    # Por ejemplo, si decides añadirla como cuarta opción y quieres que haga algo:
-    # elif selected_tool == "4. Información General":
-    # st.info("Aquí iría la información general.")
+                display_match_stats_extractor_ui()
+
 
 
 if __name__ == "__main__":
