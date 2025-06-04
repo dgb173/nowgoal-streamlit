@@ -1,7 +1,6 @@
 import streamlit as st
 from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
 from modules.datos import display_other_feature_ui
-from modules.scrap import scrap
 from modules.match_stats_extractor import display_match_stats_extractor_ui # <--- ¡NUEVA IMPORTACIÓN AQUÍ!
 
 
@@ -66,10 +65,8 @@ def main():
         display_other_feature_ui()
     
     elif selected_tool == "3. Scrapear datos":
-        scrap()
-
-    elif selected_tool == "4. Extractor de Estadísticas de Partido": # <--- ¡NUEVO BLOQUE PARA LA FUNCIÓN!
         display_match_stats_extractor_ui()
+
 
 
 if __name__ == "__main__":
