@@ -20,6 +20,7 @@ from selenium.common.exceptions import TimeoutException, WebDriverException, Ele
 from selenium.webdriver.chrome.service import Service as ChromeService
 
 import gspread
+import pandas as pd
 
 # --- CONSTANTES GLOBALES DEL SCRAPER ---
 BASE_URL = "https://live18.nowgoal25.com"
@@ -241,6 +242,12 @@ def get_h2h_details_for_original_logic(driver_instance, key_match_id_for_h2h_url
 
         # Verificar si los equipos de esta fila son los rivales A y B que buscamos (en cualquier orden)
         if {h2h_row_home_id, h2h_row_away_id} == {str(rival_a_id), str(rival_b_id)}:
+            h2h_match_id = None
+            onclick_attr = row.get("onClick") or row.get("onclick", "")
+            match_id_match = re.search(r"goLive\('/match/live-(\d+)'\)", onclick_attr)
+            if match_id_match:
+                h2h_match_id = match_id_match.group(1)
+
             score_span = row.find("span", class_="fscore_3") # El score dentro de la clase fscore_3
             if not score_span or not score_span.text or "-" not in score_span.text: continue
             
@@ -264,7 +271,8 @@ def get_h2h_details_for_original_logic(driver_instance, key_match_id_for_h2h_url
             return {"status": "found", "goles_home_h2h_row": g_h.strip(), "goles_away_h2h_row": g_a.strip(),
                     "score_raw": score_val, "handicap_raw": handicap_val_raw, "handicap_formatted": handicap_formatted,
                     "rol_rival_a_en_h2h": rol_a_in_this_h2h, "h2h_home_team_name": links[0].text.strip(),
-                    "h2h_away_team_name": links[1].text.strip()}
+                    "h2h_away_team_name": links[1].text.strip(),
+                    "h2h_match_id": h2h_match_id}
     return {"status": "not_found", "resultado": "N/A (H2H entre Oponentes no encontrado en tabla v3)"}
 
 
@@ -365,6 +373,12 @@ def extract_last_match_in_league(driver, table_css_id_str, main_team_name_in_tab
             if ( (is_home_game_filter and team_is_home_in_row) or \
                  (not is_home_game_filter and team_is_away_in_row) ) and is_correct_league:
                 
+                match_id = None
+                onclick_attr = row.get("onClick") or row.get("onclick", "")
+                match_id_match = re.search(r"goLive\('/match/live-(\d+)'\)", onclick_attr)
+                if match_id_match:
+                    match_id = match_id_match.group(1)
+
                 date_span = tds[1].find("span", {"name": "timeData"})
                 date = date_span.text.strip() if date_span else "N/A"
                 
@@ -378,11 +392,165 @@ def extract_last_match_in_league(driver, table_css_id_str, main_team_name_in_tab
                 handicap_formatted = format_ah_as_decimal_string(handicap_raw)
 
                 return {"date": date, "home_team": home_team_row_name, "away_team": away_team_row_name,
-                        "score": score, "handicap_line_raw": handicap_raw, "handicap_line_formatted": handicap_formatted}
+                        "score": score, "handicap_line_raw": handicap_raw, "handicap_line_formatted": handicap_formatted,
+                        "match_id": match_id}
         return None # No se encontró partido que cumpla los criterios
     except Exception as e:
         # st.toast(f"Error extrayendo último partido: {type(e).__name__}", icon="❌")
         return None
+
+
+# --- NUEVA FUNCIÓN: EXTRACTOR DE ESTADÍSTICAS TÉCNICAS ESPECÍFICAS DE UN PARTIDO ---
+def get_match_specific_tech_stats_for_table(driver, match_iid, match_description=""):
+    """Extrae estadísticas clave de un partido para mostrar en una tabla comparativa."""
+
+    stats_url = f"{BASE_URL}/match/live-{match_iid}"
+    stats_data = {
+        "Descripción Partido": match_description,
+        "ID Partido": match_iid if match_iid else "N/A",
+        "Tiros (L)": None,
+        "Tiros (V)": None,
+        "Tiros a Puerta (L)": None,
+        "Tiros a Puerta (V)": None,
+        "Ataques (L)": None,
+        "Ataques (V)": None,
+        "Ataques Peligrosos (L)": None,
+        "Ataques Peligrosos (V)": None,
+    }
+
+    if not match_iid:
+        return stats_data
+
+    try:
+        driver.get(stats_url)
+        WebDriverWait(driver, SELENIUM_TIMEOUT_SECONDS).until(
+            EC.presence_of_element_located((By.ID, "teamTechDiv_detail"))
+        )
+
+        soup_selenium = BeautifulSoup(driver.page_source, "html.parser")
+        team_tech_div = soup_selenium.find("div", id="teamTechDiv_detail")
+        if not team_tech_div:
+            return stats_data
+
+        stat_ul = team_tech_div.find("ul", class_="stat")
+        if not stat_ul:
+            return stats_data
+
+        desired_stats_mapping = {
+            "Shots": ("Tiros (L)", "Tiros (V)"),
+            "Shots on Goal": ("Tiros a Puerta (L)", "Tiros a Puerta (V)"),
+            "Attacks": ("Ataques (L)", "Ataques (V)"),
+            "Dangerous Attacks": ("Ataques Peligrosos (L)", "Ataques Peligrosos (V)"),
+        }
+
+        for li_element in stat_ul.find_all("li"):
+            stat_title_span = li_element.find("span", class_="stat-title")
+            if stat_title_span:
+                stat_name = stat_title_span.text.strip()
+                if stat_name in desired_stats_mapping:
+                    home_key, away_key = desired_stats_mapping[stat_name]
+                    stat_values_spans = li_element.find_all("span", class_="stat-c")
+                    if len(stat_values_spans) >= 2:
+                        home_val_str = stat_values_spans[0].text.strip()
+                        away_val_str = stat_values_spans[1].text.strip()
+                        try:
+                            stats_data[home_key] = int(home_val_str)
+                            stats_data[away_key] = int(away_val_str)
+                        except ValueError:
+                            pass
+
+    except TimeoutException:
+        pass
+    except WebDriverException:
+        pass
+    except Exception:
+        pass
+
+    return stats_data
+
+
+def display_comparative_stats_table(driver, main_match_id, mp_home_name, mp_away_name,
+                                    last_home_match_in_league, last_away_match_in_league,
+                                    details_h2h_col3):
+    """Build and show a styled dataframe with key technical stats for several matches."""
+
+    st.markdown("---")
+    st.subheader("📊 Resumen de Estadísticas Clave por Partido")
+
+    matches_to_analyze_stats = []
+
+    # Partido Principal
+    matches_to_analyze_stats.append({
+        "description": "Partido Principal",
+        "id": main_match_id,
+        "name": f"{mp_home_name} vs {mp_away_name}"
+    })
+
+    # Último partido de local
+    if last_home_match_in_league and last_home_match_in_league.get("match_id"):
+        matches_to_analyze_stats.append({
+            "description": f"Último Local {mp_home_name}",
+            "id": last_home_match_in_league["match_id"],
+            "name": f"{last_home_match_in_league['home_team']} vs {last_home_match_in_league['away_team']}"
+        })
+    else:
+        matches_to_analyze_stats.append({"description": f"Último Local {mp_home_name}", "id": None, "name": "No Encontrado"})
+
+    # Último partido de visitante
+    if last_away_match_in_league and last_away_match_in_league.get("match_id"):
+        matches_to_analyze_stats.append({
+            "description": f"Último Visitante {mp_away_name}",
+            "id": last_away_match_in_league["match_id"],
+            "name": f"{last_away_match_in_league['home_team']} vs {last_away_match_in_league['away_team']}"
+        })
+    else:
+        matches_to_analyze_stats.append({"description": f"Último Visitante {mp_away_name}", "id": None, "name": "No Encontrado"})
+
+    # H2H
+    if details_h2h_col3.get("status") == "found" and details_h2h_col3.get("h2h_match_id"):
+        matches_to_analyze_stats.append({
+            "description": f"H2H Oponentes ({details_h2h_col3.get('h2h_home_team_name','?')}-{details_h2h_col3.get('h2h_away_team_name','?')})",
+            "id": details_h2h_col3["h2h_match_id"],
+            "name": f"{details_h2h_col3.get('h2h_home_team_name','N/A')} vs {details_h2h_col3.get('h2h_away_team_name','N/A')}"
+        })
+    else:
+        matches_to_analyze_stats.append({"description": "H2H Oponentes", "id": None, "name": "No Encontrado"})
+
+    all_stats_for_table = []
+    with st.spinner("Extrayendo estadísticas técnicas para la tabla comparativa..."):
+        for match_info in matches_to_analyze_stats:
+            stats = get_match_specific_tech_stats_for_table(driver, match_info["id"], match_info["description"])
+            all_stats_for_table.append(stats)
+            time.sleep(0.5)
+
+    if all_stats_for_table:
+        df_stats = pd.DataFrame(all_stats_for_table)
+
+        def style_stats_table(df):
+            color_shots = "#E0F7FA"
+            color_attacks = "#E8F5E9"
+            shots_cols = ["Tiros (L)", "Tiros (V)", "Tiros a Puerta (L)", "Tiros a Puerta (V)"]
+            attacks_cols = ["Ataques (L)", "Ataques (V)", "Ataques Peligrosos (L)", "Ataques Peligrosos (V)"]
+
+            styles = []
+            for col in df.columns:
+                if col in shots_cols:
+                    styles.append({'selector': f'th.col_heading.col{df.columns.get_loc(col)}, td.col{df.columns.get_loc(col)}',
+                                   'props': [('background-color', color_shots)]})
+                elif col in attacks_cols:
+                    styles.append({'selector': f'th.col_heading.col{df.columns.get_loc(col)}, td.col{df.columns.get_loc(col)}',
+                                   'props': [('background-color', color_attacks)]})
+            return styles
+
+        st.dataframe(
+            df_stats.style.set_table_styles(style_stats_table(df_stats)),
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption("Los valores 'None' indican que la estadística no pudo ser extraída o no estaba disponible.")
+    else:
+        st.info("No se pudieron obtener las estadísticas técnicas para los partidos comparados.")
+
 
 
 def get_main_match_odds_selenium(driver):
@@ -586,6 +754,17 @@ def display_nowgoal_scraper_ui(gsheet_sh_handle): # gsheet_sh_handle no se usa a
                 end_time_analysis = time.time()
                 st.markdown("---")
                 st.caption(f"⏱️ Tiempo total del análisis: {end_time_analysis - start_time_analysis:.2f} segundos")
+
+                # --- NUEVA SECCIÓN DE TABLA COMPARATIVA ---
+                display_comparative_stats_table(
+                    driver_actual,
+                    main_match_id_to_process,
+                    mp_home_name,
+                    mp_away_name,
+                    last_home_match_in_league,
+                    last_away_match_in_league,
+                    details_h2h_col3,
+                )
     else: 
         st.info("✨ Ingresa un ID de partido en la barra lateral y haz clic en 'Analizar Partido' para comenzar.")
         st.caption("Nota: La primera ejecución puede tardar más mientras se inicializa el WebDriver.")
