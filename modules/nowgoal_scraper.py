@@ -479,7 +479,7 @@ def display_nowgoal_scraper_ui(): # COPIADA Y ADAPTADA
     if 'selenium_driver_instance' not in st.session_state:
         st.session_state.selenium_driver_instance = None
 
-    if analyze_button:
+     if analyze_button:
         start_time_overall = time.time()
         # Validar ID
         match_id_to_process = None
@@ -505,27 +505,32 @@ def display_nowgoal_scraper_ui(): # COPIADA Y ADAPTADA
                     get_rivals_info_cached(match_id_to_process)
 
 
-        # Fase 2: Driver Selenium
-        driver = st.session_state.selenium_driver_instance
-        # ... (Lógica para inicializar/reutilizar driver, como la tenías) ...
-        driver_needs_init = False
-        if driver is None: driver_needs_init = True
+        # Fase 2: Driver Selenium  <--- A PARTIR DE AQUÍ, ASEGURA LA INDENTACIÓN
+        driver = st.session_state.selenium_driver_instance 
+        driver_needs_init_flag = False # La variable de flag
+        if driver is None:
+            driver_needs_init_flag = True
         else:
-            try: _ = driver.current_url # Ping
-            except WebDriverException: driver_needs_init = True
+            try:
+                _ = driver.current_url # Ping
+            except WebDriverException:
+                driver_needs_init_flag = True
         
-               if driver_needs_init_flag: # Asegúrate de que esta es la variable correcta que usaste
-            if current_driver: # Usa la variable correcta para el driver
+        if driver_needs_init_flag: # Esta línea debe estar indentada correctamente bajo `if analyze_button:`
+            if driver: 
                 try:
-                    current_driver.quit()
+                    driver.quit()
                 except:
-                    pass
+                    pass 
             with st.spinner("WebDriver inicializando..."):
-                current_driver = get_selenium_driver_cached() # Usa la variable correcta para el driver
-            st.session_state.selenium_driver_instance = current_driver # Actualiza el estado de la sesión
+                driver = get_selenium_driver_cached() 
+            st.session_state.selenium_driver_instance = driver 
+        
+        if not driver: # Esta también, al mismo nivel que el if anterior
+            st.error("Driver no disponible."); 
+            st.stop()
 
-
-        # --- Expansores para cada sección ---
+        # --- Expansores para cada sección --- (Esto también debe estar bien indentado)
         main_h2h_page_url = f"{BASE_URL}/match/h2h-{match_id_to_process}"
 
         with st.expander(f"⚽ PARTIDO PRINCIPAL: {mp_h_name} vs {mp_a_name} (ID: {match_id_to_process})", expanded=True):
