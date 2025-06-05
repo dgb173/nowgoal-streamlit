@@ -1,4 +1,5 @@
 import streamlit as st
+from modules.nowgoal_scraper import display_nowgoal_scraper_ui, get_gsheets_client_and_sheet
 from modules.datos import display_other_feature_ui
 from modules.match_stats_extractor import display_match_stats_extractor_ui # <--- ¡NUEVA IMPORTACIÓN AQUÍ!
 
@@ -54,9 +55,16 @@ def main():
 
     # Mostrar la interfaz de usuario según la herramienta seleccionada
     if selected_tool == "1. Extractor de Datos de Nowgoal":
+        if gsheets_sh_handle:
+            display_nowgoal_scraper_ui(gsheets_sh_handle)
+        else:
+            st.warning("⚠️ La conexión a Google Sheets es necesaria para esta herramienta y no se pudo establecer.")
+            st.info("Asegúrate de que `gcp_service_account` esté configurado correctamente en los secretos de Streamlit.")
+
+    elif selected_tool == "2. Otra Funcionalidad (Beta)":
         display_other_feature_ui()
     
-    elif selected_tool == "2. Datosm LIVE":
+    elif selected_tool == "3. Scrapear datos":
         display_match_stats_extractor_ui()
 
 
