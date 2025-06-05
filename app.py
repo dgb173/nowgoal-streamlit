@@ -65,7 +65,7 @@ def main():
         display_other_feature_ui()
     
     elif selected_tool == "3. Scrapear datos":
-        display_other_feature_ui() # Changed from display_match_stats_extractor_ui
+        display_match_stats_extractor_ui()
 
 
 
