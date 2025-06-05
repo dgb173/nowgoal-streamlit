@@ -30,7 +30,7 @@ def main():
     # Mostrar la interfaz de usuario según la herramienta seleccionada
     if selected_tool == "1. Extractor de Datos de Nowgoal":
          display_other_feature_ui()
-    elif selected_tool == "2. Extractor de Estadísticas de Partido"
+    elif selected_tool == "2. Extractor de Estadísticas de Partido":
         display_match_stats_extractor_ui()
     
 
