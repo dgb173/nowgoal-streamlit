@@ -666,9 +666,9 @@ def display_other_feature_ui():
                     formatted_ah = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
                     st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah if formatted_ah != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
                     st.caption(f"📅 {res['date']} | ID: {res.get('match_id_for_stats', PLACEHOLDER_NODATA)}")
-                    with st.expander("📊 Ver Estadísticas de Ataque"):
-                        if not last_home_match_extra_stats_df.empty: st.dataframe(last_home_match_extra_stats_df.set_index('Estadística'), use_container_width=True)
-                        else: st.info("Estadísticas de ataque no disponibles para este partido.")
+                    st.markdown("###### 📊 Estadísticas de Ataque")
+                    if not last_home_match_extra_stats_df.empty: st.dataframe(last_home_match_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                    else: st.info("Estadísticas de ataque no disponibles para este partido.")
                 else: st.info(f"No se encontró último partido en casa para {display_home_name or 'Local'} en esta liga.")
             
             with rp_col2, st.container(border=True):
@@ -680,9 +680,9 @@ def display_other_feature_ui():
                     formatted_ah = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
                     st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah if formatted_ah != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
                     st.caption(f"📅 {res['date']} | ID: {res.get('match_id_for_stats', PLACEHOLDER_NODATA)}")
-                    with st.expander("📊 Ver Estadísticas de Ataque"):
-                        if not last_away_match_extra_stats_df.empty: st.dataframe(last_away_match_extra_stats_df.set_index('Estadística'), use_container_width=True)
-                        else: st.info("Estadísticas de ataque no disponibles para este partido.")
+                    st.markdown("###### 📊 Estadísticas de Ataque")
+                    if not last_away_match_extra_stats_df.empty: st.dataframe(last_away_match_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                    else: st.info("Estadísticas de ataque no disponibles para este partido.")
                 else: st.info(f"No se encontró último partido fuera para {display_away_name or 'Visitante'} en esta liga.")
                 
             with rp_col3, st.container(border=True):
@@ -695,9 +695,9 @@ def display_other_feature_ui():
                     formatted_ah_h2h = format_ah_as_decimal_string_of(res_h2h.get('handicap','-'))
                     st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_h2h if formatted_ah_h2h != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
                     st.caption(f"Enfrentamiento entre <span class='home-color'>{rival_a_col3_name_display}</span> y <span class='away-color'>{rival_b_col3_name_display}</span>. | ID: {res_h2h.get('match_id_for_stats', PLACEHOLDER_NODATA)}", unsafe_allow_html=True)
-                    with st.expander("📊 Ver Estadísticas de Ataque (H2H Col3)"):
-                        if not h2h_col3_extra_stats_df.empty: st.dataframe(h2h_col3_extra_stats_df.set_index('Estadística'), use_container_width=True)
-                        else: st.info("Estadísticas de ataque no disponibles para H2H Col3.")
+                    st.markdown("###### 📊 Estadísticas de Ataque (H2H Col3)")
+                    if not h2h_col3_extra_stats_df.empty: st.dataframe(h2h_col3_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                    else: st.info("Estadísticas de ataque no disponibles para H2H Col3.")
                 else: 
                     st.info(details_h2h_col3_of.get('resultado', f"H2H entre {rival_a_col3_name_display} y {rival_b_col3_name_display} no encontrado o error al procesar."))
             
@@ -729,16 +729,20 @@ def display_other_feature_ui():
                 h2h_cols2.metric("Res H2H (Local en Casa)", res1_val.replace("*",":"), help="Resultado del último H2H con el equipo local actual jugando en casa.")
                 h2h_cols3.metric("AH Actual Partido", format_ah_as_decimal_string_of(main_match_odds_data_of.get('ah_linea_raw', '?')), help="Hándicap Asiático inicial (Bet365) para este partido.")
                 if not h2h1_extra_stats_df.empty:
-                    with st.expander("📊 Estadísticas de Ataque (H2H Específico)"): st.dataframe(h2h1_extra_stats_df.set_index('Estadística'), use_container_width=True)
-                else: st.info("Estadísticas de ataque no disponibles para H2H Específico.")
+                    st.markdown("###### 📊 Estadísticas de Ataque (H2H Específico)") # Using markdown for a sub-header
+                    st.dataframe(h2h1_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                else:
+                    st.info("Estadísticas de ataque no disponibles para H2H Específico.")
 
                 st.markdown("<h5 class='card-subtitle' style='margin-top:20px;'>Último H2H General</h5>", unsafe_allow_html=True)
                 h2h_g_cols1, h2h_g_cols2 = st.columns(2)
                 h2h_g_cols1.metric("AH H2H (General)", ah6_val, help="Hándicap Asiático del H2H más reciente entre ambos equipos, sin importar localía.")
                 h2h_g_cols2.metric("Res H2H (General)", res6_val.replace("*",":"), help="Resultado del H2H más reciente entre ambos equipos.")
                 if not h2h6_extra_stats_df.empty:
-                    with st.expander("📊 Estadísticas de Ataque (H2H General)"): st.dataframe(h2h6_extra_stats_df.set_index('Estadística'), use_container_width=True)
-                else: st.info("Estadísticas de ataque no disponibles para H2H General.")
+                    st.markdown("###### 📊 Estadísticas de Ataque (H2H General)") # Using markdown for a sub-header
+                    st.dataframe(h2h6_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                else:
+                    st.info("Estadísticas de ataque no disponibles para H2H General.")
                
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True):
                 comp_col1, comp_col2 = st.columns(2)
@@ -752,8 +756,10 @@ def display_other_feature_ui():
                         st.markdown(f"⚖️ **AH (Partido Comparado):** <span class='ah-value'>{format_ah_as_decimal_string_of(ah_val_l) if ah_val_l else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
                         st.markdown(f"🏟️ **Localía de '{display_home_name or 'Local'}':** <span class='data-highlight'>{loc_val_l if loc_val_l else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
                         if not comp_l_extra_stats_df.empty:
-                            with st.expander("📊 Estadísticas de Ataque"): st.dataframe(comp_l_extra_stats_df.set_index('Estadística'), use_container_width=True)
-                        else: st.info("Estadísticas de ataque no disponibles para este partido comparado.")
+                            st.markdown("###### 📊 Estadísticas de Ataque") # Using markdown for a sub-header
+                            st.dataframe(comp_l_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                        else:
+                            st.info("Estadísticas de ataque no disponibles para este partido comparado.")
                     else: st.info("Comparativa L vs UV A no disponible.")
 
                 with comp_col2, st.container(border=True):
@@ -766,8 +772,10 @@ def display_other_feature_ui():
                         st.markdown(f"⚖️ **AH (Partido Comparado):** <span class='ah-value'>{format_ah_as_decimal_string_of(ah_val_v) if ah_val_v else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
                         st.markdown(f"🏟️ **Localía de '{display_away_name or 'Visitante'}':** <span class='data-highlight'>{loc_val_v if loc_val_v else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
                         if not comp_v_extra_stats_df.empty:
-                            with st.expander("📊 Estadísticas de Ataque"): st.dataframe(comp_v_extra_stats_df.set_index('Estadística'), use_container_width=True)
-                        else: st.info("Estadísticas de ataque no disponibles para este partido comparado.")
+                            st.markdown("###### 📊 Estadísticas de Ataque") # Using markdown for a sub-header
+                            st.dataframe(comp_v_extra_stats_df.set_index('Estadística'), use_container_width=True)
+                        else:
+                            st.info("Estadísticas de ataque no disponibles para este partido comparado.")
                     else: st.info("Comparativa V vs UL H no disponible.")
                 
             with st.expander("📋 Estadísticas Detalladas de Equipos (Resumen)", expanded=False):
