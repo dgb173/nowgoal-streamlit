@@ -1,3 +1,4 @@
+
 # modules/datos.py
 import streamlit as st
 import time
@@ -142,7 +143,7 @@ def get_match_progression_stats_data(match_id: str) -> pd.DataFrame | None:
         "Accept-Encoding": "gzip, deflate, br", "Accept-Language": "en-US,en;q=0.9", "DNT": "1",
         "Connection": "keep-alive", "Upgrade-Insecure-Requests": "1",
     }
-    stat_titles_of_interest = { # This remains the source of truth for fetching
+    stat_titles_of_interest = {
         "Shots": {"Home": "-", "Away": "-"}, "Shots on Goal": {"Home": "-", "Away": "-"},
         "Attacks": {"Home": "-", "Away": "-"}, "Dangerous Attacks": {"Home": "-", "Away": "-"},
     }
@@ -159,7 +160,7 @@ def get_match_progression_stats_data(match_id: str) -> pd.DataFrame | None:
                     title_span = li.find('span', class_='stat-title')
                     if title_span:
                         stat_title = title_span.get_text(strip=True)
-                        if stat_title in stat_titles_of_interest: # Only fetch if it's in our list
+                        if stat_title in stat_titles_of_interest:
                             values = li.find_all('span', class_='stat-c')
                             if len(values) == 2:
                                 stat_titles_of_interest[stat_title]["Home"] = values[0].get_text(strip=True)
@@ -169,7 +170,6 @@ def get_match_progression_stats_data(match_id: str) -> pd.DataFrame | None:
     df = pd.DataFrame(table_rows)
     return df.set_index("Estadistica_EN") if not df.empty else df
 
-# MODIFIED FUNCTION FOR NEW HTML/CSS STATS DISPLAY
 def display_match_progression_stats_view(match_id: str, home_team_name: str, away_team_name: str):
     stats_df = get_match_progression_stats_data(match_id)
     if stats_df is None:
@@ -179,21 +179,15 @@ def display_match_progression_stats_view(match_id: str, home_team_name: str, awa
         st.caption(f"No se encontraron datos de progresión para el partido ID: **{match_id}**.")
         return
 
-    # UPDATED stat order and content as per request
     ordered_stats_display = {
-        "Shots": "Disparos",
-        "Shots on Goal": "Disparos a Puerta",
-        "Dangerous Attacks": "Ataques Peligrosos"
+        "Shots": "Disparos", "Shots on Goal": "Disparos a Puerta",
+        "Attacks": "Ataques", "Dangerous Attacks": "Ataques Peligrosos"
     }
-
-    html_table = "<div class='stats-table-wrapper'>"
-    html_table += f"""
-    <div class='stats-table-header-row'>
-        <div class='stats-table-cell team-name home'>{home_team_name or 'Local'}</div>
-        <div class='stats-table-cell stat-desc-header'>Estadística</div>
-        <div class='stats-table-cell team-name away'>{away_team_name or 'Visitante'}</div>
-    </div>
-    """
+    st.markdown("---") # Separador visual
+    col_h_name, col_stat_name, col_a_name = st.columns([2, 3, 2])
+    with col_h_name: st.markdown(f"<p style='font-weight:bold; color: #007bff;'>{home_team_name or 'Local'}</p>", unsafe_allow_html=True)
+    with col_stat_name: st.markdown("<p style='text-align:center; font-weight:bold;'>Estadística</p>", unsafe_allow_html=True)
+    with col_a_name: st.markdown(f"<p style='text-align:right; font-weight:bold; color: #fd7e14;'>{away_team_name or 'Visitante'}</p>", unsafe_allow_html=True)
 
     for stat_key_en, stat_name_es in ordered_stats_display.items():
         if stat_key_en in stats_df.index:
@@ -202,41 +196,25 @@ def display_match_progression_stats_view(match_id: str, home_team_name: str, awa
             except ValueError: home_val_num = 0
             try: away_val_num = int(away_val_str)
             except ValueError: away_val_num = 0
-            
-            home_color_style = "var(--neutral-color)"
-            away_color_style = "var(--neutral-color)"
-            if home_val_num > away_val_num:
-                home_color_style = "var(--positive-color)"
-                away_color_style = "var(--negative-color)"
-            elif away_val_num > home_val_num:
-                home_color_style = "var(--negative-color)"
-                away_color_style = "var(--positive-color)"
+            home_color, away_color = ("green", "red") if home_val_num > away_val_num else (("red", "green") if away_val_num > home_val_num else ("black", "black"))
 
-            html_table += f"""
-            <div class='stats-table-data-row'>
-                <div class='stats-table-cell value home-value' style='color:{home_color_style};'>{home_val_str}</div>
-                <div class='stats-table-cell stat-desc'>{stat_name_es}</div>
-                <div class='stats-table-cell value away-value' style='color:{away_color_style};'>{away_val_str}</div>
-            </div>
-            """
+            c1, c2, c3 = st.columns([2, 3, 2])
+            with c1: c1.markdown(f'<p style="font-size: 1.1em; font-weight:bold; color:{home_color};">{home_val_str}</p>', unsafe_allow_html=True)
+            with c2: c2.markdown(f'<p style="text-align:center;">{stat_name_es}</p>', unsafe_allow_html=True)
+            with c3: c3.markdown(f'<p style="text-align:right; font-size: 1.1em; font-weight:bold; color:{away_color};">{away_val_str}</p>', unsafe_allow_html=True)
         else:
-            html_table += f"""
-            <div class='stats-table-data-row not-available'>
-                <div class='stats-table-cell value home-value'>-</div>
-                <div class='stats-table-cell stat-desc'>{stat_name_es} (no disp.)</div>
-                <div class='stats-table-cell value away-value'>-</div>
-            </div>
-            """
-    html_table += "</div>" # Close stats-table-wrapper
-    st.markdown(html_table, unsafe_allow_html=True)
-
+            c1, c2, c3 = st.columns([2, 3, 2])
+            with c1: c1.markdown('<p style="color:grey;">-</p>', unsafe_allow_html=True)
+            with c2: c2.markdown(f'<p style="text-align:center; color:grey;">{stat_name_es} (no disp.)</p>', unsafe_allow_html=True)
+            with c3: c3.markdown('<p style="text-align:right; color:grey;">-</p>', unsafe_allow_html=True)
+    st.markdown("---")
 
 def display_previous_match_progression_stats(title: str, match_id_str: str | None, home_name: str, away_name: str):
     if not match_id_str or match_id_str == "N/A" or not match_id_str.isdigit():
         st.caption(f"ℹ️ _No hay ID de partido para obtener estadísticas de progresión para: {title}_")
         return
 
-    st.markdown(f"<h6>👁️ _Est. Progresión para: {title}_</h6>", unsafe_allow_html=True) # h6 is styled by new CSS
+    st.markdown(f"###### 👁️ _Est. Progresión para: {title}_")
     display_match_progression_stats_view(match_id_str, home_name, away_name)
 
 # --- FUNCIONES DE EXTRACCIÓN DE DATOS DEL PARTIDO (Selenium y BeautifulSoup) ---
@@ -589,352 +567,30 @@ def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_sear
 
 # --- STREAMLIT APP UI (Función principal) ---
 def display_other_feature_ui():
-    # NEW COMPREHENSIVE CSS STYLES
+    # MODIFICADO: CSS para mejor visualización
     st.markdown("""
     <style>
-        /* General Body and Theme */
-        :root {
-            --primary-bg-color: #1A1D24; /* Darker background */
-            --secondary-bg-color: #2A2F3A; /* Slightly lighter for cards/elements */
-            --primary-text-color: #EAEAEA;
-            --secondary-text-color: #B0B0B0; /* For captions, less important text */
-            --accent-color-main: #00BFFF; /* Deep Sky Blue - for general accents, links */
-            --home-team-color: #00FF7F; /* Spring Green - for Home team emphasis */
-            --away-team-color: #FFD700; /* Gold - for Away team emphasis */
-            --positive-color: #39FF14; /* Neon Green - for positive stats/wins */
-            --negative-color: #FF3131; /* Neon Red - for negative stats/losses */
-            --neutral-color: #E0E0E0; /* Light gray for neutral stat values */
-            --ah-line-color: #DA70D6; /* Orchid - for AH lines */
-            --score-color: #FFFFFF; /* White for scores, to stand out */
-            --border-color: #404552; /* Subtle borders */
-            --font-family-main: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            --font-size-base: 16px;
-            --font-size-sm: 14px;
-            --font-size-lg: 18px;
-            --font-size-xl: 24px;
-            --font-size-xxl: 32px;
-            --border-radius: 8px;
-            --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            --section-padding: 20px;
-            --element-spacing: 15px;
-        }
-
-        body, .main, .stApp {
-            background-color: var(--primary-bg-color) !important;
-            color: var(--primary-text-color) !important;
-            font-family: var(--font-family-main) !important;
-            font-size: var(--font-size-base) !important;
-        }
-
-        /* --- Titles and Headers --- */
-        .main-title {
-            font-size: var(--font-size-xxl);
-            font-weight: 700;
-            color: var(--accent-color-main);
-            text-align: center;
-            margin-bottom: var(--element-spacing);
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        .sub-title {
-            font-size: var(--font-size-xl);
-            text-align: center;
-            margin-bottom: calc(var(--element-spacing) * 1.5);
-            color: var(--secondary-text-color);
-        }
-        .sub-title .home-color { color: var(--home-team-color) !important; font-weight: bold; }
-        .sub-title .away-color { color: var(--away-team-color) !important; font-weight: bold; }
-
-
-        .section-header {
-            font-size: var(--font-size-xl);
-            font-weight: 600;
-            color: var(--accent-color-main);
-            margin-top: calc(var(--section-padding) * 1.5);
-            margin-bottom: var(--section-padding);
-            border-bottom: 2px solid var(--accent-color-main);
-            padding-bottom: 10px;
-        }
-
-        .card-title { /* Used for sub-sections within columns */
-            font-size: var(--font-size-lg);
-            font-weight: 600;
-            color: var(--primary-text-color);
-            margin-bottom: var(--element-spacing);
-        }
-        .card-title .home-color { color: var(--home-team-color) !important; }
-        .card-title .away-color { color: var(--away-team-color) !important; }
-
-        .card-subtitle { /* Used for smaller subtitles within cards */
-            font-size: var(--font-size-base);
-            font-weight: 500;
-            color: var(--secondary-text-color);
-            margin-top: var(--element-spacing);
-            margin-bottom: calc(var(--element-spacing) / 2);
-        }
-        .card-subtitle .home-color { color: var(--home-team-color) !important; }
-        .card-subtitle .away-color { color: var(--away-team-color) !important; }
-
-        h6 { /* For match progression titles */
-            margin-top: var(--element-spacing);
-            margin-bottom: calc(var(--element-spacing) / 2);
-            font-style: normal;
-            font-weight: 500;
-            color: var(--accent-color-main);
-            font-size: var(--font-size-base);
-        }
-
-        /* --- General Element Styling --- */
-        .stCaption, caption, .caption, st.caption { /* For captions and small helper text */
-            color: var(--secondary-text-color) !important;
-            font-size: var(--font-size-sm) !important;
-        }
-        .stCaption .data-highlight, .caption .data-highlight {
-            color: var(--positive-color) !important;
-            font-weight: bold;
-        }
-
-        hr, .stDivider {
-            border-top: 1px solid var(--border-color) !important;
-            margin-top: var(--section-padding) !important;
-            margin-bottom: var(--section-padding) !important;
-        }
-
-        /* --- Card-like containers (e.g., for team stats, H2H) --- */
-        .stExpander, .stMetric {
-            background-color: var(--secondary-bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: var(--border-radius);
-            padding: var(--element-spacing);
-            margin-bottom: var(--element-spacing);
-            box-shadow: var(--box-shadow);
-        }
-
-        .stExpander header { /* Styling expander header */
-            font-size: var(--font-size-lg);
-            font-weight: 600;
-            color: var(--accent-color-main) !important; /* important to override default */
-        }
-        .stExpander div[role="button"] { /* Expander toggle button */
-            color: var(--accent-color-main) !important;
-        }
-        .stExpander div[role="button"]:hover {
-            background-color: var(--primary-bg-color) !important; /* Darken on hover */
-        }
-        .stExpander div[data-testid="stExpanderDetails"] {
-             background-color: var(--secondary-bg-color) !important; /* Ensure content area matches */
-        }
-
-
-        /* Metric styling */
-        .stMetric {
-            padding: 20px; /* More padding for metrics */
-        }
-        .stMetric label { /* Metric label (e.g., "Marcador Final") */
-            font-size: var(--font-size-base) !important;
-            color: var(--secondary-text-color) !important;
-            font-weight: 500;
-            margin-bottom: 8px;
-        }
-        .stMetric .st-ax, .stMetric div[data-testid="stMetricValue"] { /* Metric value */
-            font-size: var(--font-size-xl) !important;
-            font-weight: 700;
-            color: var(--primary-text-color) !important;
-        }
-        .stMetric div[data-testid="stMetricDelta"] { /* Metric delta (if used) */
-            font-size: var(--font-size-sm) !important;
-            color: var(--secondary-text-color) !important;
-        }
-
-        /* --- Specific Data Point Styling --- */
-        .home-color { color: var(--home-team-color) !important; font-weight: bold; }
-        .away-color { color: var(--away-team-color) !important; font-weight: bold; }
-        .score-value {
-            font-size: 1.2em; /* Slightly larger score */
-            font-weight: 700;
-            color: var(--score-color);
-            margin: 0 8px;
-            padding: 3px 6px;
-            background-color: rgba(70, 70, 90, 0.5); /* Darker, subtle background for score */
-            border-radius: 4px;
-        }
-        .ah-value {
-            font-weight: bold;
-            color: var(--ah-line-color);
-        }
-        .data-highlight { /* For generic important data points */
-            font-weight: bold;
-            color: var(--positive-color);
-        }
-
-        /* --- Standings Table (Custom Styling) --- */
-        .standings-table {
-            background-color: rgba(0,0,0,0.1); /* Slightly different background */
-            padding: 15px;
-            border-radius: var(--border-radius);
-            margin-bottom: var(--element-spacing);
-        }
-        .standings-table p {
-            margin-bottom: 0.5rem;
-            font-size: var(--font-size-sm);
-            line-height: 1.6;
-        }
-        .standings-table strong {
-            min-width: 30px; /* Adjusted for better spacing */
-            display: inline-block;
-            font-weight: 600;
-            color: var(--secondary-text-color); /* Differentiate label */
-        }
-        .standings-table .card-title { /* Title within standings card */
-            margin-bottom: 10px;
-            font-size: var(--font-size-lg);
-        }
-
-        /* --- Match Progression Stats Table (NEW) --- */
-        .stats-table-wrapper {
-            width: 100%;
-            margin-top: var(--element-spacing);
-            margin-bottom: var(--element-spacing);
-            border: 1px solid var(--border-color);
-            border-radius: var(--border-radius);
-            overflow: hidden; /* Ensures border radius is respected by children */
-            background-color: var(--secondary-bg-color);
-            box-shadow: var(--box-shadow);
-        }
-
-        .stats-table-header-row, .stats-table-data-row {
-            display: flex;
-            width: 100%;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .stats-table-header-row {
-            background-color: rgba(0,0,0,0.2); /* Darker header for the table */
-            font-weight: 600;
-        }
-        .stats-table-data-row:last-child {
-            border-bottom: none;
-        }
-        .stats-table-data-row:hover {
-            background-color: var(--primary-bg-color); /* Highlight row on hover */
-        }
-
-        .stats-table-cell {
-            padding: 12px 15px;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .stats-table-cell.team-name { /* Header team name */
-            flex: 2; /* Takes more space */
-            font-size: var(--font-size-base);
-            justify-content: center; /* Center align team names */
-        }
-        .stats-table-cell.team-name.home { color: var(--home-team-color); }
-        .stats-table-cell.team-name.away { color: var(--away-team-color); }
-
-        .stats-table-cell.stat-desc-header, /* Header "Estadística" */
-        .stats-table-cell.stat-desc {       /* Stat description in data row */
-            flex: 3; /* Central column, takes most space */
-            font-size: var(--font-size-base);
-            color: var(--primary-text-color);
-        }
-        .stats-table-cell.stat-desc-header {
-            color: var(--accent-color-main);
-        }
-
-
-        .stats-table-cell.value { /* Stat value (number) */
-            flex: 2; /* Takes more space */
-            font-size: var(--font-size-lg);
-            font-weight: 700;
-        }
-        .stats-table-cell.value.home-value {
-            justify-content: center;
-        }
-        .stats-table-cell.value.away-value {
-            justify-content: center;
-        }
-
-        .stats-table-data-row.not-available .stats-table-cell {
-            color: var(--secondary-text-color); /* Dim unavailable stats */
-            font-style: italic;
-        }
-
-        /* Sidebar styling improvements */
-        .stSidebar {
-            background-color: var(--secondary-bg-color) !important;
-            border-right: 1px solid var(--border-color) !important;
-        }
-        .stSidebar .stButton button {
-            background-color: var(--accent-color-main) !important;
-            color: #FFFFFF !important; /* White text on accent button */
-            border-radius: var(--border-radius) !important;
-            font-weight: 600;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        .stSidebar .stButton button:hover {
-            background-color: var(--home-team-color) !important;
-            color: var(--primary-bg-color) !important; /* Dark text on hover for light button */
-        }
-        .stSidebar .stTextInput input {
-            border: 1px solid var(--border-color) !important;
-            background-color: var(--primary-bg-color) !important;
-            color: var(--primary-text-color) !important;
-            border-radius: var(--border-radius) !important;
-        }
-        .stSidebar .stTextInput label {
-             color: var(--primary-text-color) !important;
-        }
-
-
-        /* Ensure Streamlit's default info/warning/error boxes also fit the theme */
-        .stAlert {
-            border-radius: var(--border-radius) !important;
-            box-shadow: var(--box-shadow);
-            color: var(--primary-text-color) !important; /* Ensure text is readable */
-        }
-        div[data-testid="stInfo"], div[data-testid="stSuccess"] {
-            background-color: rgba(0, 191, 255, 0.2) !important; /* Accent color with alpha */
-        }
-        div[data-testid="stWarning"] {
-            background-color: rgba(255, 215, 0, 0.2) !important; /* Away team color (Gold) with alpha */
-        }
-        div[data-testid="stError"] {
-            background-color: rgba(255, 49, 49, 0.2) !important; /* Negative color with alpha */
-        }
-        
-
-        /* Final polish on text elements */
-        p {
-            line-height: 1.7;
-            color: var(--primary-text-color);
-        }
-        strong {
-            font-weight: 600;
-            color: var(--primary-text-color); /* Ensure strong text is also light */
-        }
-        .standings-table strong { /* Re-specify for standings labels */
-             color: var(--secondary-text-color);
-        }
-
-
-        /* Markdown links */
-        a, a:link, a:visited {
-            color: var(--accent-color-main) !important;
-            text-decoration: none !important;
-            font-weight: 500;
-        }
-        a:hover, a:active {
-            color: var(--home-team-color) !important;
-            text-decoration: underline !important;
-        }
-
+        /* Estilos generales */
+        .main-title { font-size: 2.2em; font-weight: bold; color: #1E90FF; text-align: center; margin-bottom: 5px; }
+        .sub-title { font-size: 1.6em; text-align: center; margin-bottom: 15px; }
+        .section-header { font-size: 1.8em; font-weight: bold; color: #4682B4; margin-top: 25px; margin-bottom: 15px; border-bottom: 2px solid #4682B4; padding-bottom: 5px;}
+        .card-title { font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 10px; }
+        .card-subtitle { font-size: 1.1em; font-weight: bold; color: #555; margin-top:15px; margin-bottom: 8px; }
+        .home-color { color: #007bff; font-weight: bold; } /* Azul para local */
+        .away-color { color: #fd7e14; font-weight: bold; } /* Naranja para visitante */
+        .score-value { font-size: 1.1em; font-weight: bold; color: #28a745; margin: 0 5px; } /* Verde para marcador */
+        .ah-value { font-weight: bold; color: #6f42c1; } /* Púrpura para AH */
+        .data-highlight { font-weight: bold; color: #dc3545; } /* Rojo para datos destacados */
+        .standings-table p { margin-bottom: 0.3rem; font-size: 0.95em;}
+        .standings-table strong { min-width: 50px; display: inline-block; }
+        .stMetric { border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin-bottom:10px; background-color: #f9f9f9; }
+        .stMetric label {font-size: 0.9em !important; color: #555 !important;}
+        .stMetric .st-ax {font-size: 1.5em !important; font-weight:bold;}
+        h6 {margin-top:10px; margin-bottom:5px; font-style:italic; color: #005A9C;}
     </style>
     """, unsafe_allow_html=True)
 
-    st.sidebar.image("https://raw.githubusercontent.com/streamlit/docs/main/public/images/brand/streamlit-logo-secondary-colormark-darktext.svg", width=200) # Consider a white/light version of logo for dark sidebar
+    st.sidebar.image("https://raw.githubusercontent.com/streamlit/docs/main/public/images/brand/streamlit-logo-secondary-colormark-darktext.svg", width=200)
     st.sidebar.title("⚙️ Configuración del Partido (OF)")
     main_match_id_str_input_of = st.sidebar.text_input(
         "🆔 ID Partido Principal:", value="2696131",
@@ -966,6 +622,7 @@ def display_other_feature_ui():
 
             mp_home_id_of, mp_away_id_of, mp_league_id_of, mp_home_name_from_script, mp_away_name_from_script, mp_league_name_of = get_team_league_info_from_script_of(soup_main_h2h_page_of)
             
+            # Usar nombres de script como fallback, pero priorizar los de standings si son más completos
             home_team_main_standings = extract_standings_data_from_h2h_page_of(soup_main_h2h_page_of, mp_home_name_from_script)
             away_team_main_standings = extract_standings_data_from_h2h_page_of(soup_main_h2h_page_of, mp_away_name_from_script)
             
@@ -978,14 +635,14 @@ def display_other_feature_ui():
             st.caption(f"🏆 **Liga:** {mp_league_name_of or PLACEHOLDER_NODATA} (ID: {mp_league_id_of or PLACEHOLDER_NODATA}) | 🆔 **Partido ID:** <span class='data-highlight'>{main_match_id_to_process_of}</span>", unsafe_allow_html=True)
             st.divider()
 
+            # MODIFICADO: Sección de Clasificación mejorada
             st.markdown("<h2 class='section-header'>📈 Clasificación en Liga</h2>", unsafe_allow_html=True)
             col_home_stand, col_away_stand = st.columns(2)
 
-            def display_standings_card(team_standings_data, team_display_name, team_color_class_name): # team_color_class is now just a name
+            def display_standings_card(team_standings_data, team_display_name, team_color_class):
                 name = team_standings_data.get("name", team_display_name)
                 rank = team_standings_data.get("ranking", "N/A")
-                # Use the class name directly in the HTML
-                st.markdown(f"<h3 class='card-title {team_color_class_name}'>{name} (Ranking: {rank})</h3>", unsafe_allow_html=True)
+                st.markdown(f"<h3 class='card-title {team_color_class}'>{name} (Ranking: {rank})</h3>", unsafe_allow_html=True)
                 
                 st.markdown("<div class='standings-table'>", unsafe_allow_html=True)
                 st.markdown(f"**Total en Liga:**")
@@ -998,14 +655,15 @@ def display_other_feature_ui():
                 st.markdown("</div>", unsafe_allow_html=True)
 
             with col_home_stand:
-                display_standings_card(home_team_main_standings, display_home_name, "home-color") # Pass class name
+                display_standings_card(home_team_main_standings, display_home_name, "home-color")
             with col_away_stand:
-                display_standings_card(away_team_main_standings, display_away_name, "away-color") # Pass class name
+                display_standings_card(away_team_main_standings, display_away_name, "away-color")
             
             st.divider()
             
             key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_a_name_orig_col3 = get_rival_a_for_original_h2h_of(main_match_id_to_process_of)
             match_id_rival_b_game_ref, rival_b_id_orig_col3, rival_b_name_orig_col3 = get_rival_b_for_original_h2h_of(main_match_id_to_process_of)
+            # Aquí podrías añadir la visualización de clasificación de rivales A y B si es necesario, similar a lo anterior.
 
             main_match_odds_data_of = {}
             last_home_match_in_league_of = None
@@ -1029,7 +687,7 @@ def display_other_feature_ui():
                 try:
                     driver_actual_of.get(f"{BASE_URL_OF}{main_page_url_h2h_view_of}")
                     WebDriverWait(driver_actual_of, SELENIUM_TIMEOUT_SECONDS_OF).until(EC.presence_of_element_located((By.ID, "table_v1")))
-                    time.sleep(0.8) 
+                    time.sleep(0.8) # Dar tiempo a que cargue todo
                     main_match_odds_data_of = get_main_match_odds_selenium_of(driver_actual_of)
                     if mp_home_id_of and mp_league_id_of and display_home_name != "N/A":
                          last_home_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v1", display_home_name, mp_league_id_of, "input#cb_sos1[value='1']", True)
@@ -1040,10 +698,11 @@ def display_other_feature_ui():
 
             col_data = { "Fin": "?*?", "AH_Act": "?", "G_i": "?"}
             col_data["Fin"], _ = extract_final_score_of(soup_main_h2h_page_of)
-            col_data["Fin"] = col_data["Fin"].replace("*",":") 
+            col_data["Fin"] = col_data["Fin"].replace("*",":") # Asegurar formato con ':'
             col_data["AH_Act"] = format_ah_as_decimal_string_of(main_match_odds_data_of.get('ah_linea_raw', '?'))
             col_data["G_i"] = format_ah_as_decimal_string_of(main_match_odds_data_of.get('goals_linea_raw', '?'))
             
+            # MODIFICADO: Desempaquetar nombres de H2H general
             ah1_val, res1_val, _, match1_id_h2h_v, \
             ah6_val, res6_val, _, match6_id_h2h_g, \
             h2h_gen_home_name, h2h_gen_away_name = extract_h2h_data_of(soup_main_h2h_page_of, display_home_name, display_away_name, mp_league_id_of)
@@ -1062,14 +721,15 @@ def display_other_feature_ui():
             # --- RENDERIZACIÓN DE LA UI ---
             st.markdown("<h2 class='section-header'>🎯 Análisis Detallado del Partido</h2>", unsafe_allow_html=True)
 
-            with st.expander("⚖️ Cuotas Iniciales (Bet365) y Marcador Final (Partido Principal)", expanded=True): # Expanded by default now
+            with st.expander("⚖️ Cuotas Iniciales (Bet365) y Marcador Final (Partido Principal)", expanded=False):
+                # Usar st.metric para cuotas y marcador
                 final_score_display = col_data["Fin"] if col_data["Fin"] != "?:?" else PLACEHOLDER_NODATA
                 st.metric("🏁 Marcador Final", final_score_display)
                 st.metric("⚖️ AH (Línea Inicial)", col_data["AH_Act"] if col_data["AH_Act"] != "?" else PLACEHOLDER_NODATA,
                           f"{main_match_odds_data_of.get('ah_home_cuota','-')} / {main_match_odds_data_of.get('ah_away_cuota','-')}")
                 st.metric("🥅 Goles (Línea Inicial)", col_data["G_i"] if col_data["G_i"] != "?" else PLACEHOLDER_NODATA,
                           f"Más: {main_match_odds_data_of.get('goals_over_cuota','-')} / Menos: {main_match_odds_data_of.get('goals_under_cuota','-')}")
-                if final_score_display != PLACEHOLDER_NODATA : 
+                if final_score_display != PLACEHOLDER_NODATA : #Solo si hay marcador final, mostrar progresión
                     display_previous_match_progression_stats(
                         f"Principal: {display_home_name} vs {display_away_name}",
                         str(main_match_id_to_process_of), display_home_name, display_away_name
@@ -1130,7 +790,7 @@ def display_other_feature_ui():
                 else: st.info(details_h2h_col3_of.get('resultado', f"H2H Col3 entre {rival_a_name_orig_col3 or 'RivalA'} y {rival_b_name_orig_col3 or 'RivalB'} no encontrado."))
             st.divider()
 
-            with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=True): # Expanded by default
+            with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=False): # MODIFICADO: expanded=False por defecto
                 comp_col1, comp_col2 = st.columns(2)
                 with comp_col1:
                     st.markdown(f"<h5 class='card-subtitle'><span class='home-color'>{display_home_name}</span> vs. <span class='away-color'>Últ. Rival de {display_away_name}</span></h5>", unsafe_allow_html=True)
@@ -1165,7 +825,7 @@ def display_other_feature_ui():
                     else: st.info(f"Comparativa '{display_away_name} vs Últ. Rival de {display_home_name}' no disponible.")
             st.divider()
             
-            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True): # Expanded by default
+            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=False): # MODIFICADO: expanded=False por defecto
                 h2h_direct_col1, h2h_direct_col2 = st.columns(2)
                 with h2h_direct_col1:
                     st.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA)
@@ -1195,3 +855,5 @@ if __name__ == '__main__':
     if 'driver_other_feature' not in st.session_state:
         st.session_state.driver_other_feature = None
     display_other_feature_ui()
+
+
