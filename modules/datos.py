@@ -223,7 +223,7 @@ def display_match_progression_stats_view(
             "Dangerous Attacks": "A.Pelig." 
         }
         
-        html_parts.append("""
+        html_parts.append(""
         <table class="progression-stats-table">
             <thead>
                 <tr>
@@ -233,7 +233,7 @@ def display_match_progression_stats_view(
                 </tr>
             </thead>
             <tbody>
-        """)
+        "")
         for stat_key_en, stat_name_es in ordered_stats_display.items():
             stat_name_es_safe = html.escape(stat_name_es)
             if stat_key_en in stats_df.index:
