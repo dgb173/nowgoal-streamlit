@@ -592,10 +592,17 @@ def display_other_feature_ui():
 
     st.sidebar.image("https://raw.githubusercontent.com/streamlit/docs/main/public/images/brand/streamlit-logo-secondary-colormark-darktext.svg", width=200)
     st.sidebar.title("⚙️ Configuración del Partido (OF)")
-    main_match_id_str_input_of = st.sidebar.text_input(
-        "🆔 ID Partido Principal:", value="2696131",
-        help="Pega el ID numérico del partido que deseas analizar.", key="other_feature_match_id_input")
-    analizar_button_of = st.sidebar.button("🚀 Analizar Partido (OF)", type="primary", use_container_width=True, key="other_feature_analizar_button")
+    auto_match_id = st.session_state.pop('auto_match_id', None)
+    if auto_match_id:
+        main_match_id_str_input_of = str(auto_match_id)
+        analizar_button_of = True
+    else:
+        main_match_id_str_input_of = st.sidebar.text_input(
+            "🆔 ID Partido Principal:", value="2696131",
+            help="Pega el ID numérico del partido que deseas analizar.", key="other_feature_match_id_input")
+        analizar_button_of = st.sidebar.button(
+            "🚀 Analizar Partido (OF)", type="primary", use_container_width=True,
+            key="other_feature_analizar_button")
 
     results_container = st.container()
     if 'driver_other_feature' not in st.session_state:
