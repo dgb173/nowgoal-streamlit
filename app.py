@@ -1,6 +1,5 @@
 import streamlit as st
 from modules.datos import display_other_feature_ui
-from modules.match_stats_extractor import display_match_stats_extractor_ui # <--- ¡NUEVA IMPORTACIÓN AQUÍ!
 
 
 def main():
