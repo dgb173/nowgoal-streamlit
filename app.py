@@ -1,5 +1,7 @@
 import streamlit as st
 from modules.datos import display_other_feature_ui
+from modules.match_stats_extractor import display_match_stats_extractor_ui
+from modules.minimal_viz import display_minimal_page
 
 
 def main():
@@ -20,7 +22,8 @@ def main():
         "Selecciona una herramienta:",
         (
             "1. Extractor de Datos de Nowgoal",
-            "2. Extractor de Estadísticas de Partido" # <--- ¡NUEVA OPCIÓN EN EL MENÚ!
+            "2. Extractor de Estadísticas de Partido",
+            "3. Vista Minimal con IA"
         ),
         key="main_tool_selection_final"
     )
@@ -28,9 +31,11 @@ def main():
 
     # Mostrar la interfaz de usuario según la herramienta seleccionada
     if selected_tool == "1. Extractor de Datos de Nowgoal":
-         display_other_feature_ui()
+        display_other_feature_ui()
     elif selected_tool == "2. Extractor de Estadísticas de Partido":
         display_match_stats_extractor_ui()
+    elif selected_tool == "3. Vista Minimal con IA":
+        display_minimal_page()
     
 
 
