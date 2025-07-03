@@ -1,5 +1,6 @@
 import streamlit as st
 from modules.datos import display_other_feature_ui
+from modules.sheets_uploader import display_sheets_uploader_ui
 
 
 def main():
@@ -20,7 +21,8 @@ def main():
         "Selecciona una herramienta:",
         (
             "1. Extractor de Datos de Nowgoal",
-            "2. Extractor de Estadísticas de Partido" # <--- ¡NUEVA OPCIÓN EN EL MENÚ!
+            "2. Extractor de Estadísticas de Partido",
+            "3. Carga de Rangos a Google Sheets"
         ),
         key="main_tool_selection_final"
     )
@@ -31,6 +33,8 @@ def main():
          display_other_feature_ui()
     elif selected_tool == "2. Extractor de Estadísticas de Partido":
         display_match_stats_extractor_ui()
+    elif selected_tool == "3. Carga de Rangos a Google Sheets":
+        display_sheets_uploader_ui()
     
 
 
