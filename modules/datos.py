@@ -825,25 +825,97 @@ def display_other_feature_ui():
                     else: st.info(f"Comparativa '{display_away_name} vs Últ. Rival de {display_home_name}' no disponible.")
             st.divider()
             
-            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=False): # MODIFICADO: expanded=False por defecto
-                h2h_direct_col1, h2h_direct_col2 = st.columns(2)
-                with h2h_direct_col1:
-                    st.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA)
-                    st.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":") if col_data["Res_H2H_V"] != '?:?' else PLACEHOLDER_NODATA)
-                    if match1_id_h2h_v:
-                        display_previous_match_progression_stats(
-                            f"H2H: {display_home_name} (Casa) vs {display_away_name}",
-                            match1_id_h2h_v, display_home_name, display_away_name
-                        )
-                with h2h_direct_col2:
-                    st.metric("AH H2H (General)", col_data["AH_H2H_G"] if col_data["AH_H2H_G"] != '-' else PLACEHOLDER_NODATA)
-                    st.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":") if col_data["Res_H2H_G"] != '?:?' else PLACEHOLDER_NODATA)
-                    if match6_id_h2h_g:
-                        display_previous_match_progression_stats(
-                            f"H2H General: {h2h_gen_home_name} vs {h2h_gen_away_name}",
-                            match6_id_h2h_g, h2h_gen_home_name, h2h_gen_away_name
-                        )
-            st.divider()
+            # --- Pega este bloque completo reemplazando el original ---
+
+with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
+
+    # --- Tarjeta 1: Último H2H con Localía Actual ---
+    st.markdown("<h4 class='card-subtitle'>Último Enfrentamiento con Localía Actual</h4>", unsafe_allow_html=True)
+
+    # Obtenemos los datos de forma segura usando .get() para evitar errores
+    res_h2h_v = col_data.get("Res_H2H_V")
+
+    # Solo mostramos la tarjeta si encontramos el resultado de este partido específico
+    if res_h2h_v and res_h2h_v != '?:?':
+        # Usamos st.container(border=True) para crear una tarjeta visual
+        with st.container(border=True):
+            
+            # Encabezado: Equipos del partido
+            st.markdown(
+                f"<h6><span class='home-color'>{display_home_name}</span> vs <span class='away-color'>{display_away_name}</span></h6>",
+                unsafe_allow_html=True
+            )
+
+            # Marcador y Hándicap, presentados de forma destacada
+            score_v = res_h2h_v.replace("*", ":")
+            ah_v = col_data.get("AH_H2H_V", "-")
+            ah_v_display = ah_v if ah_v != '-' else PLACEHOLDER_NODATA
+            
+            # Usamos columnas para alinear marcador y hándicap de forma elegante
+            col_score, col_ah = st.columns([1, 2])
+            with col_score:
+                st.metric("Resultado Final", score_v)
+            with col_ah:
+                st.metric("Hándicap Asiático", ah_v_display)
+            
+            # Mostramos las estadísticas de progresión si están disponibles
+            if match1_id_h2h_v:
+                with st.container():
+                    display_previous_match_progression_stats(
+                        "", # Título vacío para un look más limpio dentro de la tarjeta
+                        match1_id_h2h_v,
+                        display_home_name,
+                        display_away_name
+                    )
+            else:
+                st.caption("ℹ️ _Estadísticas de progresión no disponibles para este partido._")
+    else:
+        st.info(f"No se encontraron H2H anteriores con {display_home_name} jugando en casa.")
+
+    st.markdown("<hr style='margin: 20px 0; border-top: 2px solid #ddd;'>", unsafe_allow_html=True)
+
+    # --- Tarjeta 2: Último H2H General ---
+    st.markdown("<h4 class='card-subtitle'>Último Enfrentamiento General (Más Reciente)</h4>", unsafe_allow_html=True)
+    
+    res_h2h_g = col_data.get("Res_H2H_G")
+
+    # Solo mostramos si hay datos del H2H general
+    if res_h2h_g and res_h2h_g != '?:?':
+        with st.container(border=True):
+
+            # Nombres de los equipos en ese partido general
+            h2h_gen_home = h2h_gen_home_name or "Local Gen."
+            h2h_gen_away = h2h_gen_away_name or "Visitante Gen."
+
+            st.markdown(
+                f"<h6><span class='home-color'>{h2h_gen_home}</span> vs <span class='away-color'>{h2h_gen_away}</span></h6>",
+                unsafe_allow_html=True
+            )
+            
+            score_g = res_h2h_g.replace("*", ":")
+            ah_g = col_data.get("AH_H2H_G", "-")
+            ah_g_display = ah_g if ah_g != '-' else PLACEHOLDER_NODATA
+            
+            col_score_g, col_ah_g = st.columns([1, 2])
+            with col_score_g:
+                st.metric("Resultado Final", score_g)
+            with col_ah_g:
+                st.metric("Hándicap Asiático", ah_g_display)
+
+            if match6_id_h2h_g:
+                with st.container():
+                     display_previous_match_progression_stats(
+                        "",
+                        match6_id_h2h_g,
+                        h2h_gen_home,
+                        h2h_gen_away
+                    )
+            else:
+                st.caption("ℹ️ _Estadísticas de progresión no disponibles para este partido._")
+    else:
+        st.info("No se encontraron datos de H2H generales entre estos dos equipos.")
+
+st.divider()
 
             end_time_of = time.time()
             st.sidebar.success(f"🎉 Análisis completado en {end_time_of - start_time_of:.2f} segundos.")
