@@ -6,3 +6,8 @@ lxml
 beautifulsoup4
 pandas
 playwright
+streamlit
+selenium
+beautifulsoup4
+pandas
+webdriver-manager
