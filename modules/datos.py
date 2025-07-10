@@ -825,55 +825,85 @@ def display_other_feature_ui():
                     else: st.info(f"Comparativa '{display_away_name} vs Últ. Rival de {display_home_name}' no disponible.")
             st.divider()
             
-           # --- Reemplazo de la sección H2H ---
+         # --- Reemplazo de la sección H2H (Versión Robusta y Corregida) ---
+
+# Asegurarse de que las variables existen antes de usarlas.
+# Estas variables deberían ser extraídas antes de llegar a este punto en tu código.
+# Si no lo están, les asignamos valores por defecto seguros.
+h2h_data = locals().get('col_data', {}) # Usa los datos locales si existen, si no, un dict vacío
+match1_id_h2h_v = locals().get('match1_id_h2h_v')
+match6_id_h2h_g = locals().get('match6_id_h2h_g')
+display_home_name = locals().get('display_home_name', 'Equipo Local')
+display_away_name = locals().get('display_away_name', 'Equipo Visitante')
+h2h_gen_home_name = locals().get('h2h_gen_home_name', 'Local (H2H Gen)')
+h2h_gen_away_name = locals().get('h2h_gen_away_name', 'Visitante (H2H Gen)')
+PLACEHOLDER_NODATA = "*(No disponible)*"
+
+# Inicio del Expander
 with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
     
+    # --- Tarjeta 1: Último H2H con Localía Actual ---
     st.markdown("<h4 class='card-subtitle'>Último Enfrentamiento con Localía Actual</h4>", unsafe_allow_html=True)
     
-    # H2H Específico (Local en casa)
-    if col_data.get("Res_H2H_V") != '?:?':
-        # Crear una tarjeta contenedora con un borde
+    # Comprobamos si tenemos datos para este H2H específico
+    res_h2h_v = h2h_data.get("Res_H2H_V")
+    if res_h2h_v and res_h2h_v != '?:?':
+        # Usamos un contenedor para agrupar visualmente la tarjeta
         with st.container(border=True):
-            # Título del partido
             st.markdown(f"**<span class='home-color'>{display_home_name}</span> vs <span class='away-color'>{display_away_name}</span>**", unsafe_allow_html=True)
             
-            # Marcador y Hándicap en una línea
-            res_h2h_v = col_data["Res_H2H_V"].replace("*", ":")
-            ah_h2h_v = col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA
-            st.markdown(f"### <span class='score-value'>{res_h2h_v}</span>", unsafe_allow_html=True)
-            st.markdown(f"**Hándicap Asiático:** <span class='ah-value'>{ah_h2h_v}</span>", unsafe_allow_html=True)
+            # Extraemos y formateamos los datos de forma segura
+            score_v = res_h2h_v.replace("*", ":")
+            ah_v = h2h_data.get("AH_H2H_V", "-")
+            ah_v_display = ah_v if ah_v != '-' else PLACEHOLDER_NODATA
             
-            # Estadísticas de progresión si existen
+            st.markdown(f"### <span class='score-value'>{score_v}</span>", unsafe_allow_html=True)
+            st.markdown(f"**Hándicap Asiático:** <span class='ah-value'>{ah_v_display}</span>", unsafe_allow_html=True)
+            
+            # Comprobamos si el ID del partido existe antes de mostrar las estadísticas
             if match1_id_h2h_v:
-                with st.container(): # Contenedor interno para las stats
+                with st.container():
                     display_previous_match_progression_stats(
                         "Estadísticas de este partido:",
-                        match1_id_h2h_v, display_home_name, display_away_name
+                        match1_id_h2h_v,
+                        display_home_name,
+                        display_away_name
                     )
+            else:
+                st.caption("_Estadísticas de progresión no disponibles (sin ID de partido)._")
     else:
         st.info(f"No se encontraron datos de un H2H anterior con {display_home_name} jugando como local.")
 
-    st.markdown("<h4 class='card-subtitle' style='margin-top: 20px;'>Último Enfrentamiento General</h4>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 25px 0;'>", unsafe_allow_html=True) # Un separador más visible
+
+    # --- Tarjeta 2: Último H2H General ---
+    st.markdown("<h4 class='card-subtitle'>Último Enfrentamiento General</h4>", unsafe_allow_html=True)
     
-    # H2H General
-    if col_data.get("Res_H2H_G") != '?:?':
+    # Comprobamos si tenemos datos para el H2H general
+    res_h2h_g = h2h_data.get("Res_H2H_G")
+    if res_h2h_g and res_h2h_g != '?:?':
         with st.container(border=True):
-            # Título del partido
             st.markdown(f"**<span class='home-color'>{h2h_gen_home_name}</span> vs <span class='away-color'>{h2h_gen_away_name}</span>**", unsafe_allow_html=True)
             
-            # Marcador y Hándicap
-            res_h2h_g = col_data["Res_H2H_G"].replace("*", ":")
-            ah_h2h_g = col_data["AH_H2H_G"] if col_data["AH_H2H_G"] != '-' else PLACEHOLDER_NODATA
-            st.markdown(f"### <span class='score-value'>{res_h2h_g}</span>", unsafe_allow_html=True)
-            st.markdown(f"**Hándicap Asiático:** <span class='ah-value'>{ah_h2h_g}</span>", unsafe_allow_html=True)
+            # Extraemos y formateamos de forma segura
+            score_g = res_h2h_g.replace("*", ":")
+            ah_g = h2h_data.get("AH_H2H_G", "-")
+            ah_g_display = ah_g if ah_g != '-' else PLACEHOLDER_NODATA
             
-            # Estadísticas de progresión
+            st.markdown(f"### <span class='score-value'>{score_g}</span>", unsafe_allow_html=True)
+            st.markdown(f"**Hándicap Asiático:** <span class='ah-value'>{ah_g_display}</span>", unsafe_allow_html=True)
+            
+            # Comprobamos si el ID existe antes de mostrar las estadísticas
             if match6_id_h2h_g:
                 with st.container():
                      display_previous_match_progression_stats(
                         "Estadísticas de este partido:",
-                        match6_id_h2h_g, h2h_gen_home_name, h2h_gen_away_name
+                        match6_id_h2h_g,
+                        h2h_gen_home_name,
+                        h2h_gen_away_name
                     )
+            else:
+                st.caption("_Estadísticas de progresión no disponibles (sin ID de partido)._")
     else:
         st.info("No se encontraron datos del último H2H general.")
 
