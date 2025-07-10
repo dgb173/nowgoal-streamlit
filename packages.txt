@@ -18,4 +18,3 @@ libasound2
 libexpat1
 libfontconfig1
 libfreetype6
-google-chrome-stable
