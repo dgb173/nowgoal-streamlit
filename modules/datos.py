@@ -831,73 +831,72 @@ def display_other_feature_ui():
             # --- NUEVA SECCIÓN H2H: VISUAL Y ROBUSTA ---
            # --- INICIO DEL NUEVO BLOQUE DE CÓDIGO PARA H2H DIRECTOS ---
 
+# --- INICIO DEL NUEVO BLOQUE: H2H DIRECTOS CON DISEÑO DE 2 TARJETAS (CORREGIDO) ---
+
 with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
 
-    # Dividimos el espacio en dos columnas para nuestras dos tarjetas
+    # Creamos las dos columnas para nuestras tarjetas
     col1, col2 = st.columns(2)
 
-    # --- Tarjeta 1: Último H2H con Localía Actual (en la primera columna) ---
+    # --- Tarjeta 1: H2H con Localía Actual ---
     with col1:
-        st.markdown("<h5 class='card-title' style='text-align: center;'>Último Enfrentamiento (Localía Actual)</h5>", unsafe_allow_html=True)
-        
-        # Obtenemos los datos de forma segura
-        res_v = col_data.get("Res_H2H_V")
-
-        if res_v and res_v != '?:?':
-            with st.container(border=True, height=350): # Contenedor con altura fija para alinear
-                st.markdown(
-                    f"🆚 <span class='home-color'>{display_home_name}</span> vs <span class='away-color'>{display_away_name}</span>",
-                    unsafe_allow_html=True
-                )
+        st.markdown("<h5 style='text-align:center;'>Último (Localía Actual)</h5>", unsafe_allow_html=True)
+        with st.container(border=True, height=350):
+            
+            # Obtenemos TODOS los datos necesarios del diccionario `col_data`
+            res_v = col_data.get("Res_H2H_V")
+            ah_v = col_data.get("AH_H2H_V", "-")
+            match_id_v = col_data.get("match1_id_h2h_v") # Extraemos el ID desde col_data
+            
+            if res_v and res_v != '?:?':
+                rival_name = display_away_name # El rival es el equipo visitante principal
                 
-                score_v = res_v.replace("*", ":")
-                ah_v = col_data.get("AH_H2H_V", "-")
-                
-                st.markdown(f"<div style='text-align:center; font-size:1.8em; font-weight:bold; margin: 10px 0;'>{score_v}</div>", unsafe_allow_html=True)
-                st.markdown(f"<p style='text-align:center;'><strong>AH:</strong> <span class='ah-value'>{ah_v if ah_v != '-' else PLACEHOLDER_NODATA}</span></p>", unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#F0F2F6; padding: 2px 5px; border-radius:3px; display:inline-block;'>VS <span class='away-color'>{rival_name}</span></div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div style='margin-top:10px;'>
+                        <span class='home-color'>{display_home_name}</span> {res_v.replace("*", ":")} <span class='away-color'>{rival_name}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+                st.markdown(f"**AH:** {ah_v if ah_v != '-' else PLACEHOLDER_NODATA}")
 
-                if match1_id_h2h_v:
-                    # Este pequeño botón o texto se puede agregar si quieres detalles
-                    if st.button("Ver Stats de Progresión 👁️", key="stats_h2h_v"):
-                         display_previous_match_progression_stats("", match1_id_h2h_v, display_home_name, display_away_name)
+                if match_id_v:
+                    display_previous_match_progression_stats(f"Est. Prog. H2H (Local vs. Visitante)", match_id_v, display_home_name, rival_name)
                 else:
                     st.caption("Stats de progresión no disponibles.")
-        else:
-            with st.container(border=True, height=350):
-                st.info(f"No se encontraron H2H anteriores con {display_home_name} jugando en casa.")
-
-    # --- Tarjeta 2: Último H2H General (en la segunda columna) ---
+            else:
+                st.info(f"No se encontraron H2H con {display_home_name} jugando en casa.")
+    
+    # --- Tarjeta 2: H2H General ---
     with col2:
-        st.markdown("<h5 class='card-title' style='text-align: center;'>Último Enfrentamiento (General)</h5>", unsafe_allow_html=True)
-        
-        res_g = col_data.get("Res_H2H_G")
+        st.markdown("<h5 style='text-align:center;'>Último (General)</h5>", unsafe_allow_html=True)
+        with st.container(border=True, height=350):
+            
+            # Obtenemos TODOS los datos necesarios
+            res_g = col_data.get("Res_H2H_G")
+            ah_g = col_data.get("AH_H2H_G", "-")
+            match_id_g = col_data.get("match6_id_h2h_g") # Extraemos el ID desde col_data
+            home_g = h2h_gen_home_name or "Local Gen."
+            away_g = h2h_gen_away_name or "Visitante Gen."
 
-        if res_g and res_g != '?:?':
-            with st.container(border=True, height=350): # Contenedor con altura fija para alinear
-                home_g = h2h_gen_home_name or "Local"
-                away_g = h2h_gen_away_name or "Visitante"
+            if res_g and res_g != '?:?':
+                # No ponemos la etiqueta "VS" aquí porque los equipos ya están en el resultado
+                st.markdown(f"""
+                    <div style='margin-top:28px;'>
+                        <span class='home-color'>{home_g}</span> {res_g.replace("*", ":")} <span class='away-color'>{away_g}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+                st.markdown(f"**AH:** {ah_g if ah_g != '-' else PLACEHOLDER_NODATA}")
                 
-                st.markdown(
-                    f"🆚 <span class='home-color'>{home_g}</span> vs <span class='away-color'>{away_g}</span>",
-                    unsafe_allow_html=True
-                )
-
-                score_g = res_g.replace("*", ":")
-                ah_g = col_data.get("AH_H2H_G", "-")
-
-                st.markdown(f"<div style='text-align:center; font-size:1.8em; font-weight:bold; margin: 10px 0;'>{score_g}</div>", unsafe_allow_html=True)
-                st.markdown(f"<p style='text-align:center;'><strong>AH:</strong> <span class='ah-value'>{ah_g if ah_g != '-' else PLACEHOLDER_NODATA}</span></p>", unsafe_allow_html=True)
-                
-                if match6_id_h2h_g:
-                    if st.button("Ver Stats de Progresión 👁️", key="stats_h2h_g"):
-                         display_previous_match_progression_stats("", match6_id_h2h_g, home_g, away_g)
+                if match_id_g:
+                    display_previous_match_progression_stats(f"Est. Prog. H2H (General)", match_id_g, home_g, away_g)
                 else:
                     st.caption("Stats de progresión no disponibles.")
-        else:
-             with st.container(border=True, height=350):
+            else:
                 st.info("No se encontraron H2H generales.")
 
 st.divider()
+
+# --- FIN DEL NUEVO BLOQUE ---
 
 # --- FIN DEL NUEVO BLOQUE DE CÓDIGO ---
             # --- FIN DE LA NUEVA SECCIÓN H2H ---
