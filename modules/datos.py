@@ -827,96 +827,53 @@ def display_other_feature_ui():
             
             # --- Pega este bloque completo reemplazando el original ---
 
-with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
+            # --- NUEVA SECCIÓN H2H: VISUAL Y ROBUSTA ---
+            # Asegúrate de que este bloque esté correctamente indentado dentro del `with results_container, st.spinner(...)`
+            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
 
-    # --- Tarjeta 1: Último H2H con Localía Actual ---
-    st.markdown("<h4 class='card-subtitle'>Último Enfrentamiento con Localía Actual</h4>", unsafe_allow_html=True)
+                # --- Tarjeta 1: H2H con Localía Actual ---
+                st.markdown("<h4 class='card-subtitle'>Último Enfrentamiento con Localía Actual</h4>", unsafe_allow_html=True)
+                
+                # Usamos .get() para evitar errores si la clave no existe
+                res_v = col_data.get("Res_H2H_V")
 
-    # Obtenemos los datos de forma segura usando .get() para evitar errores
-    res_h2h_v = col_data.get("Res_H2H_V")
+                if res_v and res_v != '?:?':
+                    with st.container(border=True):
+                        st.markdown(f"<h6><span class='home-color'>{display_home_name}</span> vs <span class='away-color'>{display_away_name}</span></h6>", unsafe_allow_html=True)
+                        
+                        col1, col2 = st.columns(2)
+                        col1.metric("Resultado Final", res_v.replace("*",":"))
+                        col2.metric("Hándicap Asiático", col_data.get("AH_H2H_V", PLACEHOLDER_NODATA))
+                        
+                        # Aquí, match1_id_h2h_v ya debería existir desde la extracción de datos
+                        if match1_id_h2h_v:
+                            display_previous_match_progression_stats("", match1_id_h2h_v, display_home_name, display_away_name)
+                else:
+                    st.info(f"No se encontraron H2H anteriores con {display_home_name} como local.")
+                
+                st.markdown("---")
 
-    # Solo mostramos la tarjeta si encontramos el resultado de este partido específico
-    if res_h2h_v and res_h2h_v != '?:?':
-        # Usamos st.container(border=True) para crear una tarjeta visual
-        with st.container(border=True):
-            
-            # Encabezado: Equipos del partido
-            st.markdown(
-                f"<h6><span class='home-color'>{display_home_name}</span> vs <span class='away-color'>{display_away_name}</span></h6>",
-                unsafe_allow_html=True
-            )
+                # --- Tarjeta 2: H2H General Más Reciente ---
+                st.markdown("<h4 class='card-subtitle'>Último Enfrentamiento General</h4>", unsafe_allow_html=True)
+                
+                res_g = col_data.get("Res_H2H_G")
 
-            # Marcador y Hándicap, presentados de forma destacada
-            score_v = res_h2h_v.replace("*", ":")
-            ah_v = col_data.get("AH_H2H_V", "-")
-            ah_v_display = ah_v if ah_v != '-' else PLACEHOLDER_NODATA
-            
-            # Usamos columnas para alinear marcador y hándicap de forma elegante
-            col_score, col_ah = st.columns([1, 2])
-            with col_score:
-                st.metric("Resultado Final", score_v)
-            with col_ah:
-                st.metric("Hándicap Asiático", ah_v_display)
-            
-            # Mostramos las estadísticas de progresión si están disponibles
-            if match1_id_h2h_v:
-                with st.container():
-                    display_previous_match_progression_stats(
-                        "", # Título vacío para un look más limpio dentro de la tarjeta
-                        match1_id_h2h_v,
-                        display_home_name,
-                        display_away_name
-                    )
-            else:
-                st.caption("ℹ️ _Estadísticas de progresión no disponibles para este partido._")
-    else:
-        st.info(f"No se encontraron H2H anteriores con {display_home_name} jugando en casa.")
+                if res_g and res_g != '?:?':
+                    with st.container(border=True):
+                        st.markdown(f"<h6><span class='home-color'>{h2h_gen_home_name or 'Local'}</span> vs <span class='away-color'>{h2h_gen_away_name or 'Visitante'}</span></h6>", unsafe_allow_html=True)
 
-    st.markdown("<hr style='margin: 20px 0; border-top: 2px solid #ddd;'>", unsafe_allow_html=True)
+                        col1, col2 = st.columns(2)
+                        col1.metric("Resultado Final", res_g.replace("*",":"))
+                        col2.metric("Hándicap Asiático", col_data.get("AH_H2H_G", PLACEHOLDER_NODATA))
 
-    # --- Tarjeta 2: Último H2H General ---
-    st.markdown("<h4 class='card-subtitle'>Último Enfrentamiento General (Más Reciente)</h4>", unsafe_allow_html=True)
-    
-    res_h2h_g = col_data.get("Res_H2H_G")
+                        # Aquí, match6_id_h2h_g ya debería existir
+                        if match6_id_h2h_g:
+                            display_previous_match_progression_stats("", match6_id_h2h_g, h2h_gen_home_name, h2h_gen_away_name)
+                else:
+                    st.info("No se encontraron H2H generales.")
 
-    # Solo mostramos si hay datos del H2H general
-    if res_h2h_g and res_h2h_g != '?:?':
-        with st.container(border=True):
-
-            # Nombres de los equipos en ese partido general
-            h2h_gen_home = h2h_gen_home_name or "Local Gen."
-            h2h_gen_away = h2h_gen_away_name or "Visitante Gen."
-
-            st.markdown(
-                f"<h6><span class='home-color'>{h2h_gen_home}</span> vs <span class='away-color'>{h2h_gen_away}</span></h6>",
-                unsafe_allow_html=True
-            )
-            
-            score_g = res_h2h_g.replace("*", ":")
-            ah_g = col_data.get("AH_H2H_G", "-")
-            ah_g_display = ah_g if ah_g != '-' else PLACEHOLDER_NODATA
-            
-            col_score_g, col_ah_g = st.columns([1, 2])
-            with col_score_g:
-                st.metric("Resultado Final", score_g)
-            with col_ah_g:
-                st.metric("Hándicap Asiático", ah_g_display)
-
-            if match6_id_h2h_g:
-                with st.container():
-                     display_previous_match_progression_stats(
-                        "",
-                        match6_id_h2h_g,
-                        h2h_gen_home,
-                        h2h_gen_away
-                    )
-            else:
-                st.caption("ℹ️ _Estadísticas de progresión no disponibles para este partido._")
-    else:
-        st.info("No se encontraron datos de H2H generales entre estos dos equipos.")
-
-st.divider()
-
+            st.divider()
+            # --- FIN DE LA NUEVA SECCIÓN H2H ---
             end_time_of = time.time()
             st.sidebar.success(f"🎉 Análisis completado en {end_time_of - start_time_of:.2f} segundos.")
     else:
