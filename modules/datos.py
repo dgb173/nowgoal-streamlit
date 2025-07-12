@@ -660,6 +660,42 @@ def display_other_feature_ui():
                 display_standings_card(away_team_main_standings, display_away_name, "away-color")
             
             st.divider()
+            #Fin de la clasificacion
+            
+            #INICIO H2H
+            
+             st.markdown("<h2 class='section-header'>🔰 Hándicaps y Resultados Clave (H2H Directos)</h2>", unsafe_allow_html=True)
+            with st.container(): # Usamos un contenedor para agrupar visualmente
+                h2h_direct_col1, h2h_direct_col2 = st.columns(2)
+                
+                with h2h_direct_col1:
+                    st.markdown(f"<h5 class='card-subtitle'>H2H Directo: <span class='home-color'>{display_home_name}</span> (en casa)</h5>", unsafe_allow_html=True)
+                    if col_data["Res_H2H_V"] != '?:?':
+                        st.markdown(f"⚽ **Res:** <span class='data-highlight'>{col_data['Res_H2H_V'].replace('*',':')}</span>", unsafe_allow_html=True)
+                        st.markdown(f"⚖️ **AH:** <span class='ah-value'>{format_ah_as_decimal_string_of(col_data['AH_H2H_V']) or PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+                        if match1_id_h2h_v:
+                            display_previous_match_progression_stats(
+                                f"H2H (L-C): {display_home_name} vs {display_away_name}",
+                                match1_id_h2h_v, display_home_name, display_away_name
+                            )
+                    else:
+                        st.info(f"No se encontró un H2H directo con '{display_home_name}' jugando como local.")
+
+                with h2h_direct_col2:
+                    st.markdown(f"<h5 class='card-subtitle'>H2H Directo: Último Partido General</h5>", unsafe_allow_html=True)
+                    if col_data["Res_H2H_G"] != '?:?':
+                        st.markdown(f"⚽ **Res:** <span class='data-highlight'>{col_data['Res_H2H_G'].replace('*',':')}</span> ({h2h_gen_home_name} vs {h2h_gen_away_name})", unsafe_allow_html=True)
+                        st.markdown(f"⚖️ **AH:** <span class='ah-value'>{format_ah_as_decimal_string_of(col_data['AH_H2H_G']) or PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+                        if match6_id_h2h_g:
+                            display_previous_match_progression_stats(
+                                f"H2H General: {h2h_gen_home_name} vs {h2h_gen_away_name}",
+                                match6_id_h2h_g, h2h_gen_home_name, h2h_gen_away_name
+                            )
+                    else:
+                        st.info("No se encontró un H2H directo general reciente.")
+            st.divider()
+            
+            #FIN H2H DIRECTO
             
             key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_a_name_orig_col3 = get_rival_a_for_original_h2h_of(main_match_id_to_process_of)
             match_id_rival_b_game_ref, rival_b_id_orig_col3, rival_b_name_orig_col3 = get_rival_b_for_original_h2h_of(main_match_id_to_process_of)
@@ -825,26 +861,7 @@ def display_other_feature_ui():
                     else: st.info(f"Comparativa '{display_away_name} vs Últ. Rival de {display_home_name}' no disponible.")
             st.divider()
             
-            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=False): # MODIFICADO: expanded=False por defecto
-                h2h_direct_col1, h2h_direct_col2 = st.columns(2)
-                with h2h_direct_col1:
-                    st.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA)
-                    st.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":") if col_data["Res_H2H_V"] != '?:?' else PLACEHOLDER_NODATA)
-                    if match1_id_h2h_v:
-                        display_previous_match_progression_stats(
-                            f"H2H: {display_home_name} (Casa) vs {display_away_name}",
-                            match1_id_h2h_v, display_home_name, display_away_name
-                        )
-                with h2h_direct_col2:
-                    st.metric("AH H2H (General)", col_data["AH_H2H_G"] if col_data["AH_H2H_G"] != '-' else PLACEHOLDER_NODATA)
-                    st.metric("Res H2H (General)", col_data["Res_H2H_G"].replace("*",":") if col_data["Res_H2H_G"] != '?:?' else PLACEHOLDER_NODATA)
-                    if match6_id_h2h_g:
-                        display_previous_match_progression_stats(
-                            f"H2H General: {h2h_gen_home_name} vs {h2h_gen_away_name}",
-                            match6_id_h2h_g, h2h_gen_home_name, h2h_gen_away_name
-                        )
-            st.divider()
-
+          
             end_time_of = time.time()
             st.sidebar.success(f"🎉 Análisis completado en {end_time_of - start_time_of:.2f} segundos.")
     else:
