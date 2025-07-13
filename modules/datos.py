@@ -738,58 +738,86 @@ def display_other_feature_ui():
                     st.caption("Estadísticas de progresión se mostrarán si el partido ha finalizado y hay marcador.")
 
 
-            st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Reciente y H2H Indirecto</h3>", unsafe_allow_html=True)
-            rp_col1, rp_col2, rp_col3 = st.columns(3)
-            with rp_col1:
-                st.markdown(f"<h4 class='card-title'>Último <span class='home-color'>{display_home_name}</span> (Casa)</h4>", unsafe_allow_html=True)
-                if last_home_match_in_league_of:
-                    res = last_home_match_in_league_of
-                    st.markdown(f"🆚 <span class='away-color'>{res['away_team']}</span>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
-                    formatted_ah_lh = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
-                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_lh if formatted_ah_lh != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
-                    st.caption(f"📅 {res.get('date', 'N/A')}")
-                    display_previous_match_progression_stats(
-                        f"Últ. {res.get('home_team','L')} (C) vs {res.get('away_team','V')}",
-                        res.get('match_id'), res.get('home_team','Local'), res.get('away_team','Visitante')
-                    )
-                else: st.info(f"No se encontró último partido en casa para {display_home_name}.")
+         # Usamos st.expander para crear un contenedor colapsable.
+# El primer argumento es el título que siempre estará visible.
+# expanded=False hace que empiece cerrado por defecto.
 
-            with rp_col2:
-                st.markdown(f"<h4 class='card-title'>Último <span class='away-color'>{display_away_name}</span> (Fuera)</h4>", unsafe_allow_html=True)
-                if last_away_match_in_league_of:
-                    res = last_away_match_in_league_of
-                    st.markdown(f"🆚 <span class='home-color'>{res['home_team']}</span>", unsafe_allow_html=True)
-                    st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
-                    formatted_ah_la = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
-                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_la if formatted_ah_la != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
-                    st.caption(f"📅 {res.get('date', 'N/A')}")
-                    display_previous_match_progression_stats(
-                        f"Últ. {res.get('away_team','V')} (F) vs {res.get('home_team','L')}",
-                        res.get('match_id'), res.get('home_team','Local'), res.get('away_team','Visitante')
-                    )
-                else: st.info(f"No se encontró último partido fuera para {display_away_name}.")
+with st.expander("⚡ Rendimiento Reciente y H2H Indirecto (Haz clic para ver)", expanded=False):
 
-            with rp_col3:
-                st.markdown(f"<h4 class='card-title'>🆚 H2H Rivales (Col3)</h4>", unsafe_allow_html=True)
-                details_h2h_col3_of = {"status": "error", "resultado": PLACEHOLDER_NODATA}
-                if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of:
-                    details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_b_id_orig_col3, rival_a_name_orig_col3, rival_b_name_orig_col3)
+    # Todo el código que tenías antes para las 3 columnas va aquí, con una sangría adicional.
+    rp_col1, rp_col2, rp_col3 = st.columns(3)
 
-                if details_h2h_col3_of.get("status") == "found":
-                    res_h2h = details_h2h_col3_of
-                    h2h_home_name_col3 = res_h2h.get('h2h_home_team_name', 'Local H2H')
-                    h2h_away_name_col3 = res_h2h.get('h2h_away_team_name', 'Visitante H2H')
-                    st.markdown(f"<span class='home-color'>{h2h_home_name_col3}</span> <span class='score-value'>{res_h2h.get('goles_home', '?')}:{res_h2h.get('goles_away', '?')}</span> <span class='away-color'>{h2h_away_name_col3}</span>", unsafe_allow_html=True)
-                    formatted_ah_h2h_col3 = format_ah_as_decimal_string_of(res_h2h.get('handicap','-'))
-                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_h2h_col3 if formatted_ah_h2h_col3 != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
-                    display_previous_match_progression_stats(
-                        f"H2H Col3: {h2h_home_name_col3} vs {h2h_away_name_col3}",
-                        res_h2h.get('match_id'), h2h_home_name_col3, h2h_away_name_col3
-                    )
-                else: st.info(details_h2h_col3_of.get('resultado', f"H2H Col3 entre {rival_a_name_orig_col3 or 'RivalA'} y {rival_b_name_orig_col3 or 'RivalB'} no encontrado."))
-            st.divider()
+    # --- Columna 1: Último partido del equipo LOCAL en CASA ---
+    with rp_col1:
+        st.markdown(f"<h4 class='card-title'>Último <span class='home-color'>{display_home_name}</span> (Casa)</h4>", unsafe_allow_html=True)
+        if last_home_match_in_league_of:
+            res = last_home_match_in_league_of
+            st.markdown(f"🆚 <span class='away-color'>{res['away_team']}</span>", unsafe_allow_html=True)
+            st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
+            
+            formatted_ah_lh = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
+            st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_lh if formatted_ah_lh != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+            
+            goal_line_lh = res.get('goal_line_raw', '-') 
+            st.markdown(f"**O/U:** <span class='goal-line-value'>{goal_line_lh if goal_line_lh != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
 
+            st.caption(f"📅 {res.get('date', 'N/A')}")
+            display_previous_match_progression_stats(
+                f"Últ. {res.get('home_team','L')} (C) vs {res.get('away_team','V')}",
+                res.get('match_id'), res.get('home_team','Local'), res.get('away_team','Visitante')
+            )
+        else: 
+            st.info(f"No se encontró último partido en casa para {display_home_name}.")
+
+    # --- Columna 2: Último partido del equipo VISITANTE FUERA ---
+    with rp_col2:
+        st.markdown(f"<h4 class='card-title'>Último <span class='away-color'>{display_away_name}</span> (Fuera)</h4>", unsafe_allow_html=True)
+        if last_away_match_in_league_of:
+            res = last_away_match_in_league_of
+            st.markdown(f"🆚 <span class='home-color'>{res['home_team']}</span>", unsafe_allow_html=True)
+            st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
+            
+            formatted_ah_la = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
+            st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_la if formatted_ah_la != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+
+            goal_line_la = res.get('goal_line_raw', '-')
+            st.markdown(f"**O/U:** <span class='goal-line-value'>{goal_line_la if goal_line_la != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+            
+            st.caption(f"📅 {res.get('date', 'N/A')}")
+            display_previous_match_progression_stats(
+                f"Últ. {res.get('away_team','V')} (F) vs {res.get('home_team','L')}",
+                res.get('match_id'), res.get('home_team','Local'), res.get('away_team','Visitante')
+            )
+        else: 
+            st.info(f"No se encontró último partido fuera para {display_away_name}.")
+
+    # --- Columna 3: H2H entre rivales ---
+    with rp_col3:
+        st.markdown(f"<h4 class='card-title'>🆚 H2H Rivales (Col3)</h4>", unsafe_allow_html=True)
+        details_h2h_col3_of = {"status": "error", "resultado": PLACEHOLDER_NODATA}
+        if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of:
+            details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_b_id_orig_col3, rival_a_name_orig_col3, rival_b_name_orig_col3)
+
+        if details_h2h_col3_of.get("status") == "found":
+            res_h2h = details_h2h_col3_of
+            h2h_home_name_col3 = res_h2h.get('h2h_home_team_name', 'Local H2H')
+            h2h_away_name_col3 = res_h2h.get('h2h_away_team_name', 'Visitante H2H')
+            st.markdown(f"<span class='home-color'>{h2h_home_name_col3}</span> <span class='score-value'>{res_h2h.get('goles_home', '?')}:{res_h2h.get('goles_away', '?')}</span> <span class='away-color'>{h2h_away_name_col3}</span>", unsafe_allow_html=True)
+            
+            formatted_ah_h2h_col3 = format_ah_as_decimal_string_of(res_h2h.get('handicap','-'))
+            st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_h2h_col3 if formatted_ah_h2h_col3 != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+            
+            goal_line_h2h_col3 = res_h2h.get('goal_line_raw', '-')
+            st.markdown(f"**O/U:** <span class='goal-line-value'>{goal_line_h2h_col3 if goal_line_h2h_col3 != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+            
+            display_previous_match_progression_stats(
+                f"H2H Col3: {h2h_home_name_col3} vs {h2h_away_name_col3}",
+                res_h2h.get('match_id'), h2h_home_name_col3, h2h_away_name_col3
+            )
+        else: 
+            st.info(details_h2h_col3_of.get('resultado', f"H2H Col3 entre {rival_a_name_orig_col3 or 'RivalA'} y {rival_b_name_orig_col3 or 'RivalB'} no encontrado."))
+
+st.divider() # Este divider ahora estará fuera del expander.
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=False): # MODIFICADO: expanded=False por defecto
                 comp_col1, comp_col2 = st.columns(2)
                 with comp_col1:
