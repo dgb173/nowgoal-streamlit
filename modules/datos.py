@@ -1,4 +1,3 @@
-
 # modules/datos.py
 import streamlit as st
 import time
@@ -410,6 +409,82 @@ def extract_last_match_in_league_of(driver, table_css_id_str, main_team_name_in_
         return None
     except Exception: return None
 
+# --- NUEVA FUNCIÓN ---
+def extract_last_match_overall_of(driver, table_css_id_str, main_team_name_in_table, league_id_filter_value):
+    """
+    Extrae el último partido general (casa o fuera) de un equipo, devolviendo también el ID del rival.
+    """
+    try:
+        # Asegurarse de que el filtro "All" (todos los partidos) esté seleccionado para no filtrar por localía
+        all_filter_selector = f"input#cb_sos{table_css_id_str[-1]}[value='0']"
+        click_element_robust_of(driver, By.CSS_SELECTOR, all_filter_selector)
+        time.sleep(0.8) # Pausa para que la tabla se actualice
+
+        if league_id_filter_value:
+            league_checkbox_selector = f"input#checkboxleague{table_css_id_str[-1]}[value='{league_id_filter_value}']"
+            click_element_robust_of(driver, By.CSS_SELECTOR, league_checkbox_selector)
+            time.sleep(0.8)
+
+        page_source_updated = driver.page_source
+        soup_updated = BeautifulSoup(page_source_updated, "html.parser")
+        table = soup_updated.find("table", id=table_css_id_str)
+        if not table: return None
+
+        for row in table.find_all("tr", id=re.compile(rf"tr{table_css_id_str[-1]}_\d+")):
+            if row.get("style") and "display:none" in row.get("style", "").lower(): continue
+            if league_id_filter_value and row.get("name") != str(league_id_filter_value): continue
+
+            tds = row.find_all("td")
+            if len(tds) < 14: continue
+
+            home_team_row_el = tds[2].find("a")
+            away_team_row_el = tds[4].find("a")
+            if not home_team_row_el or not away_team_row_el: continue
+
+            home_team_row_name = home_team_row_el.text.strip()
+            away_team_row_name = away_team_row_el.text.strip()
+
+            team_is_home_in_row = main_team_name_in_table.lower() == home_team_row_name.lower()
+            team_is_away_in_row = main_team_name_in_table.lower() == away_team_row_name.lower()
+
+            if team_is_home_in_row or team_is_away_in_row:
+                # Se encontró el primer partido del equipo, extraer datos del rival
+                opponent_element = away_team_row_el if team_is_home_in_row else home_team_row_el
+                opponent_name = opponent_element.text.strip()
+                opponent_id = None
+                onclick_attr = opponent_element.get("onclick")
+                if onclick_attr:
+                    id_match = re.search(r"team\((\d+)\)", onclick_attr)
+                    if id_match:
+                        opponent_id = id_match.group(1)
+
+                date_span = tds[1].find("span", {"name": "timeData"})
+                date = date_span.text.strip() if date_span else "N/A"
+                
+                score_class_re = re.compile(r"fscore_")
+                score_span = tds[3].find("span", class_=score_class_re)
+                score = score_span.text.strip() if score_span else "N/A"
+                
+                handicap_cell = tds[11]
+                handicap_raw = handicap_cell.get("data-o", handicap_cell.text.strip())
+                if not handicap_raw or handicap_raw.strip() == "-":
+                    handicap_raw = "N/A"
+                else:
+                    handicap_raw = handicap_raw.strip()
+
+                match_id_last_game = row.get('index')
+
+                # Devolver el primer partido encontrado
+                return {
+                    "date": date, "home_team": home_team_row_name, "away_team": away_team_row_name,
+                    "score": score, "handicap_line_raw": handicap_raw, "match_id": match_id_last_game,
+                    "opponent_name": opponent_name, "opponent_id": opponent_id
+                }
+        return None
+    except Exception:
+        return None
+
+
 def get_main_match_odds_selenium_of(driver):
     odds_info = {"ah_home_cuota": "N/A", "ah_linea_raw": "N/A", "ah_away_cuota": "N/A", "goals_over_cuota": "N/A", "goals_linea_raw": "N/A", "goals_under_cuota": "N/A"}
     try:
@@ -658,7 +733,6 @@ def display_other_feature_ui():
 
             mp_home_id_of, mp_away_id_of, mp_league_id_of, mp_home_name_from_script, mp_away_name_from_script, mp_league_name_of = get_team_league_info_from_script_of(soup_main_h2h_page_of)
             
-            # Usar nombres de script como fallback, pero priorizar los de standings si son más completos
             home_team_main_standings = extract_standings_data_from_h2h_page_of(soup_main_h2h_page_of, mp_home_name_from_script)
             away_team_main_standings = extract_standings_data_from_h2h_page_of(soup_main_h2h_page_of, mp_away_name_from_script)
             
@@ -671,7 +745,6 @@ def display_other_feature_ui():
             st.caption(f"🏆 **Liga:** {mp_league_name_of or PLACEHOLDER_NODATA} (ID: {mp_league_id_of or PLACEHOLDER_NODATA}) | 🆔 **Partido ID:** <span class='data-highlight'>{main_match_id_to_process_of}</span>", unsafe_allow_html=True)
             st.divider()
 
-            # MODIFICADO: Sección de Clasificación mejorada
             st.markdown("<h2 class='section-header'>📈 Clasificación en Liga</h2>", unsafe_allow_html=True)
             col_home_stand, col_away_stand = st.columns(2)
 
@@ -682,12 +755,12 @@ def display_other_feature_ui():
                 
                 st.markdown("<div class='standings-table'>", unsafe_allow_html=True)
                 st.markdown(f"**Total en Liga:**")
-                st.markdown(f"<p><strong>PJ:</strong> {team_standings_data.get('total_pj', '-')}   <strong>V:</strong> {team_standings_data.get('total_v', '-')}   <strong>E:</strong> {team_standings_data.get('total_e', '-')}   <strong>D:</strong> {team_standings_data.get('total_d', '-')}</p>", unsafe_allow_html=True)
-                st.markdown(f"<p><strong>GF:</strong> {team_standings_data.get('total_gf', '-')}   <strong>GC:</strong> {team_standings_data.get('total_gc', '-')}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p><strong>PJ:</strong> {team_standings_data.get('total_pj', '-')}  <strong>V:</strong> {team_standings_data.get('total_v', '-')}  <strong>E:</strong> {team_standings_data.get('total_e', '-')}  <strong>D:</strong> {team_standings_data.get('total_d', '-')}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p><strong>GF:</strong> {team_standings_data.get('total_gf', '-')}  <strong>GC:</strong> {team_standings_data.get('total_gc', '-')}</p>", unsafe_allow_html=True)
                 
                 st.markdown(f"**{team_standings_data.get('specific_type', 'Estadísticas Específicas')}:**")
-                st.markdown(f"<p><strong>PJ:</strong> {team_standings_data.get('specific_pj', '-')}   <strong>V:</strong> {team_standings_data.get('specific_v', '-')}   <strong>E:</strong> {team_standings_data.get('specific_e', '-')}   <strong>D:</strong> {team_standings_data.get('specific_d', '-')}</p>", unsafe_allow_html=True)
-                st.markdown(f"<p><strong>GF:</strong> {team_standings_data.get('specific_gf', '-')}   <strong>GC:</strong> {team_standings_data.get('specific_gc', '-')}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p><strong>PJ:</strong> {team_standings_data.get('specific_pj', '-')}  <strong>V:</strong> {team_standings_data.get('specific_v', '-')}  <strong>E:</strong> {team_standings_data.get('specific_e', '-')}  <strong>D:</strong> {team_standings_data.get('specific_d', '-')}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p><strong>GF:</strong> {team_standings_data.get('specific_gf', '-')}  <strong>GC:</strong> {team_standings_data.get('specific_gc', '-')}</p>", unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
             with col_home_stand:
@@ -699,11 +772,14 @@ def display_other_feature_ui():
             
             key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_a_name_orig_col3 = get_rival_a_for_original_h2h_of(main_match_id_to_process_of)
             match_id_rival_b_game_ref, rival_b_id_orig_col3, rival_b_name_orig_col3 = get_rival_b_for_original_h2h_of(main_match_id_to_process_of)
-            # Aquí podrías añadir la visualización de clasificación de rivales A y B si es necesario, similar a lo anterior.
 
             main_match_odds_data_of = {}
             last_home_match_in_league_of = None
             last_away_match_in_league_of = None
+            # --- NUEVA VARIABLE ---
+            last_overall_home_team_match = None
+            last_overall_away_team_match = None
+
             driver_actual_of = st.session_state.driver_other_feature
             driver_of_needs_init = driver_actual_of is None
             if not driver_of_needs_init:
@@ -723,22 +799,30 @@ def display_other_feature_ui():
                 try:
                     driver_actual_of.get(f"{BASE_URL_OF}{main_page_url_h2h_view_of}")
                     WebDriverWait(driver_actual_of, SELENIUM_TIMEOUT_SECONDS_OF).until(EC.presence_of_element_located((By.ID, "table_v1")))
-                    time.sleep(0.8) # Dar tiempo a que cargue todo
+                    time.sleep(0.8)
                     main_match_odds_data_of = get_main_match_odds_selenium_of(driver_actual_of)
+                    
+                    # Extracción para sección original
                     if mp_home_id_of and mp_league_id_of and display_home_name != "N/A":
                          last_home_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v1", display_home_name, mp_league_id_of, "input#cb_sos1[value='1']", True)
                     if mp_away_id_of and mp_league_id_of and display_away_name != "N/A":
                         last_away_match_in_league_of = extract_last_match_in_league_of(driver_actual_of, "table_v2", display_away_name, mp_league_id_of, "input#cb_sos2[value='2']", False)
+
+                    # --- NUEVA EXTRACCIÓN PARA SECCIÓN GENERAL ---
+                    if mp_home_id_of and mp_league_id_of and display_home_name != "N/A":
+                        last_overall_home_team_match = extract_last_match_overall_of(driver_actual_of, "table_v1", display_home_name, mp_league_id_of)
+                    if mp_away_id_of and mp_league_id_of and display_away_name != "N/A":
+                        last_overall_away_team_match = extract_last_match_overall_of(driver_actual_of, "table_v2", display_away_name, mp_league_id_of)
+
                 except Exception as e_main_sel_of: st.error(f"❗ Error Selenium: {type(e_main_sel_of).__name__} - {e_main_sel_of}.")
             else: st.warning("❗ WebDriver no disponible. Cuotas y últimos partidos filtrados podrían faltar.")
 
             col_data = { "Fin": "?*?", "AH_Act": "?", "G_i": "?"}
             col_data["Fin"], _ = extract_final_score_of(soup_main_h2h_page_of)
-            col_data["Fin"] = col_data["Fin"].replace("*",":") # Asegurar formato con ':'
+            col_data["Fin"] = col_data["Fin"].replace("*",":")
             col_data["AH_Act"] = format_ah_as_decimal_string_of(main_match_odds_data_of.get('ah_linea_raw', '?'))
             col_data["G_i"] = format_ah_as_decimal_string_of(main_match_odds_data_of.get('goals_linea_raw', '?'))
             
-            # MODIFICADO: Desempaquetar nombres de H2H general
             ah1_val, res1_val, _, match1_id_h2h_v, \
             ah6_val, res6_val, _, match6_id_h2h_g, \
             h2h_gen_home_name, h2h_gen_away_name = extract_h2h_data_of(soup_main_h2h_page_of, display_home_name, display_away_name, mp_league_id_of)
@@ -758,14 +842,13 @@ def display_other_feature_ui():
             st.markdown("<h2 class='section-header'>🎯 Análisis Detallado del Partido</h2>", unsafe_allow_html=True)
 
             with st.expander("⚖️ Cuotas Iniciales (Bet365) y Marcador Final (Partido Principal)", expanded=False):
-                # Usar st.metric para cuotas y marcador
                 final_score_display = col_data["Fin"] if col_data["Fin"] != "?:?" else PLACEHOLDER_NODATA
                 st.metric("🏁 Marcador Final", final_score_display)
                 st.metric("⚖️ AH (Línea Inicial)", col_data["AH_Act"] if col_data["AH_Act"] != "?" else PLACEHOLDER_NODATA,
                           f"{main_match_odds_data_of.get('ah_home_cuota','-')} / {main_match_odds_data_of.get('ah_away_cuota','-')}")
                 st.metric("🥅 Goles (Línea Inicial)", col_data["G_i"] if col_data["G_i"] != "?" else PLACEHOLDER_NODATA,
                           f"Más: {main_match_odds_data_of.get('goals_over_cuota','-')} / Menos: {main_match_odds_data_of.get('goals_under_cuota','-')}")
-                if final_score_display != PLACEHOLDER_NODATA : #Solo si hay marcador final, mostrar progresión
+                if final_score_display != PLACEHOLDER_NODATA :
                     display_previous_match_progression_stats(
                         f"Principal: {display_home_name} vs {display_away_name}",
                         str(main_match_id_to_process_of), display_home_name, display_away_name
@@ -774,7 +857,7 @@ def display_other_feature_ui():
                     st.caption("Estadísticas de progresión se mostrarán si el partido ha finalizado y hay marcador.")
 
 
-            st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Reciente y H2H Indirecto</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Reciente (Local vs Visitante) y H2H Indirecto</h3>", unsafe_allow_html=True)
             rp_col1, rp_col2, rp_col3 = st.columns(3)
             with rp_col1:
                 st.markdown(f"<h4 class='card-title'>Último <span class='home-color'>{display_home_name}</span> (Casa)</h4>", unsafe_allow_html=True)
@@ -807,7 +890,7 @@ def display_other_feature_ui():
                 else: st.info(f"No se encontró último partido fuera para {display_away_name}.")
 
             with rp_col3:
-                st.markdown(f"<h4 class='card-title'>🆚 H2H Rivales (Col3)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 class='card-title'>🆚 H2H Rivales Recientes</h4>", unsafe_allow_html=True)
                 details_h2h_col3_of = {"status": "error", "resultado": PLACEHOLDER_NODATA}
                 if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of:
                     details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_b_id_orig_col3, rival_a_name_orig_col3, rival_b_name_orig_col3)
@@ -820,13 +903,81 @@ def display_other_feature_ui():
                     formatted_ah_h2h_col3 = format_ah_as_decimal_string_of(res_h2h.get('handicap','-'))
                     st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_h2h_col3 if formatted_ah_h2h_col3 != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
                     display_previous_match_progression_stats(
-                        f"H2H Col3: {h2h_home_name_col3} vs {h2h_away_name_col3}",
+                        f"H2H Rivales: {h2h_home_name_col3} vs {h2h_away_name_col3}",
                         res_h2h.get('match_id'), h2h_home_name_col3, h2h_away_name_col3
                     )
-                else: st.info(details_h2h_col3_of.get('resultado', f"H2H Col3 entre {rival_a_name_orig_col3 or 'RivalA'} y {rival_b_name_orig_col3 or 'RivalB'} no encontrado."))
+                else: st.info(details_h2h_col3_of.get('resultado', f"H2H entre {rival_a_name_orig_col3 or 'RivalA'} y {rival_b_name_orig_col3 or 'RivalB'} no encontrado."))
             st.divider()
 
-            with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=False): # MODIFICADO: expanded=False por defecto
+            # --- INICIO DE LA NUEVA SECCIÓN ---
+            st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Último Partido (General) y H2H Indirecto</h3>", unsafe_allow_html=True)
+            rp_gen_col1, rp_gen_col2, rp_gen_col3 = st.columns(3)
+            with rp_gen_col1:
+                st.markdown(f"<h4 class='card-title'>Último General <span class='home-color'>{display_home_name}</span></h4>", unsafe_allow_html=True)
+                if last_overall_home_team_match:
+                    res = last_overall_home_team_match
+                    is_home = res['home_team'].lower() == display_home_name.lower()
+                    opponent_name = res['away_team'] if is_home else res['home_team']
+                    st.markdown(f"🆚 <span class='away-color'>{opponent_name}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
+                    formatted_ah_lh = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
+                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_lh if formatted_ah_lh != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+                    st.caption(f"📅 {res.get('date', 'N/A')}")
+                    display_previous_match_progression_stats(
+                        f"Últ. Gen. {display_home_name} vs {opponent_name}",
+                        res.get('match_id'), res.get('home_team','Local'), res.get('away_team','Visitante')
+                    )
+                else: st.info(f"No se encontró último partido general para {display_home_name}.")
+
+            with rp_gen_col2:
+                st.markdown(f"<h4 class='card-title'>Último General <span class='away-color'>{display_away_name}</span></h4>", unsafe_allow_html=True)
+                if last_overall_away_team_match:
+                    res = last_overall_away_team_match
+                    is_home = res['home_team'].lower() == display_away_name.lower()
+                    opponent_name = res['away_team'] if is_home else res['home_team']
+                    st.markdown(f"🆚 <span class='home-color'>{opponent_name}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
+                    formatted_ah_la = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
+                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_la if formatted_ah_la != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+                    st.caption(f"📅 {res.get('date', 'N/A')}")
+                    display_previous_match_progression_stats(
+                        f"Últ. Gen. {display_away_name} vs {opponent_name}",
+                        res.get('match_id'), res.get('home_team','Local'), res.get('away_team','Visitante')
+                    )
+                else: st.info(f"No se encontró último partido general para {display_away_name}.")
+
+            with rp_gen_col3:
+                st.markdown(f"<h4 class='card-title'>🆚 H2H Últimos Rivales</h4>", unsafe_allow_html=True)
+                details_h2h_new_sec = {"status": "error", "resultado": PLACEHOLDER_NODATA}
+                if last_overall_home_team_match and last_overall_away_team_match and driver_actual_of:
+                    key_match = last_overall_home_team_match.get('match_id')
+                    rival_a_id = last_overall_home_team_match.get('opponent_id')
+                    rival_a_name = last_overall_home_team_match.get('opponent_name')
+                    rival_b_id = last_overall_away_team_match.get('opponent_id')
+                    rival_b_name = last_overall_away_team_match.get('opponent_name')
+                    
+                    if key_match and rival_a_id and rival_b_id and rival_a_name and rival_b_name:
+                         details_h2h_new_sec = get_h2h_details_for_original_logic_of(driver_actual_of, key_match, rival_a_id, rival_b_id, rival_a_name, rival_b_name)
+                    else:
+                        details_h2h_new_sec['resultado'] = "Faltan IDs de rivales para buscar H2H."
+
+                if details_h2h_new_sec.get("status") == "found":
+                    res_h2h = details_h2h_new_sec
+                    h2h_home_name_col3 = res_h2h.get('h2h_home_team_name', 'Local H2H')
+                    h2h_away_name_col3 = res_h2h.get('h2h_away_team_name', 'Visitante H2H')
+                    st.markdown(f"<span class='home-color'>{h2h_home_name_col3}</span> <span class='score-value'>{res_h2h.get('goles_home', '?')}:{res_h2h.get('goles_away', '?')}</span> <span class='away-color'>{h2h_away_name_col3}</span>", unsafe_allow_html=True)
+                    formatted_ah_h2h_col3 = format_ah_as_decimal_string_of(res_h2h.get('handicap','-'))
+                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_h2h_col3 if formatted_ah_h2h_col3 != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+                    display_previous_match_progression_stats(
+                        f"H2H Rivales Gen.: {h2h_home_name_col3} vs {h2h_away_name_col3}",
+                        res_h2h.get('match_id'), h2h_home_name_col3, h2h_away_name_col3
+                    )
+                else: st.info(details_h2h_new_sec.get('resultado', f"H2H no disponible."))
+            st.divider()
+            # --- FIN DE LA NUEVA SECCIÓN ---
+
+
+            with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=False):
                 comp_col1, comp_col2 = st.columns(2)
                 with comp_col1:
                     st.markdown(f"<h5 class='card-subtitle'><span class='home-color'>{display_home_name}</span> vs. <span class='away-color'>Últ. Rival de {display_away_name}</span></h5>", unsafe_allow_html=True)
@@ -861,7 +1012,7 @@ def display_other_feature_ui():
                     else: st.info(f"Comparativa '{display_away_name} vs Últ. Rival de {display_home_name}' no disponible.")
             st.divider()
             
-            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=False): # MODIFICADO: expanded=False por defecto
+            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=False):
                 h2h_direct_col1, h2h_direct_col2 = st.columns(2)
                 with h2h_direct_col1:
                     st.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA)
