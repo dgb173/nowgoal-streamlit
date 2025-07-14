@@ -88,27 +88,63 @@ def format_ah_as_decimal_string_of(ah_line_str: str, for_sheets=False):
     return output_str
 
 def get_match_details_from_row_of(row_element, score_class_selector='score', source_table_type='h2h'):
+    """
+    Función REESCRITA para manejar correctamente la tabla de H2H y las de historial.
+    """
     try:
-        cells = row_element.find_all('td')
-        if len(cells) < 12: return None
-        league_id_hist_attr = row_element.get('name')
-        home_idx, score_idx, away_idx, ah_idx = 2, 3, 4, 11
-        home_tag = cells[home_idx].find('a'); home = home_tag.text.strip() if home_tag else cells[home_idx].text.strip()
-        away_tag = cells[away_idx].find('a'); away = away_tag.text.strip() if away_tag else cells[away_idx].text.strip()
-        score_cell_content = cells[score_idx].text.strip()
-        score_span = cells[score_idx].find('span', class_=lambda x: x and score_class_selector in x)
-        score_raw_text = score_span.text.strip() if score_span else score_cell_content
-        score_m = re.match(r'(\d+-\d+)', score_raw_text); score_raw = score_m.group(1) if score_m else '?-?'
-        score_fmt = score_raw.replace('-', ':') if score_raw != '?-?' else '?:?' # MODIFICADO para usar ':'
-        ah_line_raw_text = cells[ah_idx].text.strip()
-        ah_line_fmt = format_ah_as_decimal_string_of(ah_line_raw_text)
+        # La tabla H2H usa <th> para las cuotas, las otras usan <td>
+        cells = row_element.find_all(['td', 'th']) 
+        
+        # Índices de las celdas comunes a todas las tablas
+        home_idx, score_idx, away_idx = 2, 3, 4
+        
+        home_tag = cells[home_idx].find('a')
+        home = home_tag.text.strip() if home_tag else cells[home_idx].text.strip()
+
+        away_tag = cells[away_idx].find('a')
+        away = away_tag.text.strip() if away_tag else cells[away_idx].text.strip()
+
+        score_span = cells[score_idx].find('span', class_=score_class_selector)
+        score_raw = '?-?'
+        if score_span:
+            score_match = re.search(r'(\d+-\d+)', score_span.text)
+            if score_match:
+                score_raw = score_match.group(1)
+        
+        score_fmt = score_raw.replace('-', ':')
         match_id = row_element.get('index')
-        if not home or not away: return None
-        return {'home': home, 'away': away, 'score': score_fmt, 'score_raw': score_raw,
-                'ahLine': ah_line_fmt, 'ahLine_raw': ah_line_raw_text,
-                'matchIndex': match_id, 'vs': row_element.get('vs'),
-                'league_id_hist': league_id_hist_attr}
-    except Exception: return None
+
+        # === Lógica para extraer cuotas ===
+        ah_line_raw_text = '-'
+        # Las cuotas de AH están en diferentes posiciones dependiendo de la tabla.
+        # En la tabla de H2H ('table_v3'), las celdas de AH van de la 12 a la 14
+        # usando 'th', y la línea está en la 13 (índice 12).
+        if source_table_type == 'h2h' and len(cells) > 13:
+            # Para la tabla de H2H, los datos están en los 'th' del final
+            ah_line_raw_text = cells[13].text.strip() # AH Line es la celda del medio (Índice 13 en las TH)
+        elif source_table_type != 'h2h' and len(cells) > 11:
+            # Para tablas de historial (v1, v2) que usan 'td'
+            ah_line_raw_text = cells[11].text.strip()
+
+        ah_line_fmt = format_ah_as_decimal_string_of(ah_line_raw_text)
+
+        if not home or not away or not match_id:
+            return None
+
+        return {
+            'home': home, 
+            'away': away, 
+            'score': score_fmt, 
+            'score_raw': score_raw,
+            'ahLine': ah_line_fmt, 
+            'ahLine_raw': ah_line_raw_text,
+            'matchIndex': match_id, 
+            'vs': row_element.get('vs'),
+            'league_id_hist': row_element.get('name')
+        }
+    except Exception:
+        # Si algo falla en la extracción de una fila, es más seguro devolver None
+        return None
 
 # --- SESIÓN Y FETCHING ---
 @st.cache_resource
