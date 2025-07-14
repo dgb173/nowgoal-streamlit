@@ -966,7 +966,7 @@ with st.expander("⚡ Rendimiento Reciente y H2H Indirecto (Haz clic para ver)",
             with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=False): # MODIFICADO: expanded=False por defecto
                 h2h_direct_col1, h2h_direct_col2 = st.columns(2)
                 with h2h_direct_col1:
-                    st.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA)
+                    st.metric("HANDICAP EN CASA)", col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA)
                     st.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":") if col_data["Res_H2H_V"] != '?:?' else PLACEHOLDER_NODATA)
                     if match1_id_h2h_v:
                         display_previous_match_progression_stats(
