@@ -90,25 +90,57 @@ def format_ah_as_decimal_string_of(ah_line_str: str, for_sheets=False):
 def get_match_details_from_row_of(row_element, score_class_selector='score', source_table_type='h2h'):
     try:
         cells = row_element.find_all('td')
-        if len(cells) < 12: return None
+        # La tabla de H2H (v3) tiene 15+ celdas. Las de historial (v1,v2) tienen otra cantidad.
+        if len(cells) < 14: # Un mínimo razonable de celdas para evitar errores.
+            return None
+
         league_id_hist_attr = row_element.get('name')
-        home_idx, score_idx, away_idx, ah_idx = 2, 3, 4, 11
-        home_tag = cells[home_idx].find('a'); home = home_tag.text.strip() if home_tag else cells[home_idx].text.strip()
-        away_tag = cells[away_idx].find('a'); away = away_tag.text.strip() if away_tag else cells[away_idx].text.strip()
+        
+        # --- Índices de Celdas (ajustados a la realidad del HTML) ---
+        home_idx, score_idx, away_idx = 2, 3, 4
+        # Índices específicos para Bet365 que se carga por defecto en la tabla H2H y de Historial.
+        AH_LINE_IDX = 12
+        GOALS_LINE_IDX = 15
+        
+        home_tag = cells[home_idx].find('a')
+        home = home_tag.text.strip() if home_tag else cells[home_idx].text.strip()
+
+        away_tag = cells[away_idx].find('a')
+        away = away_tag.text.strip() if away_tag else cells[away_idx].text.strip()
+        
         score_cell_content = cells[score_idx].text.strip()
         score_span = cells[score_idx].find('span', class_=lambda x: x and score_class_selector in x)
         score_raw_text = score_span.text.strip() if score_span else score_cell_content
-        score_m = re.match(r'(\d+-\d+)', score_raw_text); score_raw = score_m.group(1) if score_m else '?-?'
-        score_fmt = score_raw.replace('-', ':') if score_raw != '?-?' else '?:?' # MODIFICADO para usar ':'
-        ah_line_raw_text = cells[ah_idx].text.strip()
-        ah_line_fmt = format_ah_as_decimal_string_of(ah_line_raw_text)
+        score_m = re.match(r'(\d+-\d+)', score_raw_text)
+        score_raw = score_m.group(1) if score_m else '?-?'
+        score_fmt = score_raw.replace('-', ':')
+        
         match_id = row_element.get('index')
-        if not home or not away: return None
-        return {'home': home, 'away': away, 'score': score_fmt, 'score_raw': score_raw,
-                'ahLine': ah_line_fmt, 'ahLine_raw': ah_line_raw_text,
-                'matchIndex': match_id, 'vs': row_element.get('vs'),
-                'league_id_hist': league_id_hist_attr}
-    except Exception: return None
+
+        # Extraer AH y Línea de Goles de las celdas correctas
+        ah_line_raw_text = cells[AH_LINE_IDX].text.strip() if len(cells) > AH_LINE_IDX else '-'
+        goal_line_raw_text = cells[GOALS_LINE_IDX].text.strip() if len(cells) > GOALS_LINE_IDX else '-'
+
+        ah_line_fmt = format_ah_as_decimal_string_of(ah_line_raw_text)
+
+        if not home or not away or not match_id:
+            return None
+            
+        return {
+            'home': home, 
+            'away': away, 
+            'score': score_fmt, 
+            'score_raw': score_raw,
+            'ahLine': ah_line_fmt, 
+            'ahLine_raw': ah_line_raw_text,
+            'goalLine': goal_line_raw_text, # <--- NUEVO CAMPO AÑADIDO
+            'matchIndex': match_id, 
+            'vs': row_element.get('vs'),
+            'league_id_hist': league_id_hist_attr
+        }
+    except (IndexError, AttributeError): 
+        # Si falla el acceso a una celda, ignora la fila.
+        return None
 
 # --- SESIÓN Y FETCHING ---
 @st.cache_resource
@@ -491,6 +523,7 @@ def extract_final_score_of(soup):
     return '?:?', "?-?"
 
 # MODIFICADO: para devolver nombres del H2H general
+#HISTORICO DE LOS DOS EQUIPOS FUNCION
 def extract_h2h_data_of(soup, main_home_team_name, main_away_team_name, current_league_id):
     ah1, res1, res1_raw, match1_id = '-', '?:?', '?-?', None
     ah6, res6, res6_raw, match6_id = '-', '?:?', '?-?', None
