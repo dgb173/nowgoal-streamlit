@@ -90,57 +90,25 @@ def format_ah_as_decimal_string_of(ah_line_str: str, for_sheets=False):
 def get_match_details_from_row_of(row_element, score_class_selector='score', source_table_type='h2h'):
     try:
         cells = row_element.find_all('td')
-        # La tabla de H2H (v3) tiene 15+ celdas. Las de historial (v1,v2) tienen otra cantidad.
-        if len(cells) < 14: # Un mínimo razonable de celdas para evitar errores.
-            return None
-
+        if len(cells) < 12: return None
         league_id_hist_attr = row_element.get('name')
-        
-        # --- Índices de Celdas (ajustados a la realidad del HTML) ---
-        home_idx, score_idx, away_idx = 2, 3, 4
-        # Índices específicos para Bet365 que se carga por defecto en la tabla H2H y de Historial.
-        AH_LINE_IDX = 12
-        GOALS_LINE_IDX = 15
-        
-        home_tag = cells[home_idx].find('a')
-        home = home_tag.text.strip() if home_tag else cells[home_idx].text.strip()
-
-        away_tag = cells[away_idx].find('a')
-        away = away_tag.text.strip() if away_tag else cells[away_idx].text.strip()
-        
+        home_idx, score_idx, away_idx, ah_idx = 2, 3, 4, 11
+        home_tag = cells[home_idx].find('a'); home = home_tag.text.strip() if home_tag else cells[home_idx].text.strip()
+        away_tag = cells[away_idx].find('a'); away = away_tag.text.strip() if away_tag else cells[away_idx].text.strip()
         score_cell_content = cells[score_idx].text.strip()
         score_span = cells[score_idx].find('span', class_=lambda x: x and score_class_selector in x)
         score_raw_text = score_span.text.strip() if score_span else score_cell_content
-        score_m = re.match(r'(\d+-\d+)', score_raw_text)
-        score_raw = score_m.group(1) if score_m else '?-?'
-        score_fmt = score_raw.replace('-', ':')
-        
-        match_id = row_element.get('index')
-
-        # Extraer AH y Línea de Goles de las celdas correctas
-        ah_line_raw_text = cells[AH_LINE_IDX].text.strip() if len(cells) > AH_LINE_IDX else '-'
-        goal_line_raw_text = cells[GOALS_LINE_IDX].text.strip() if len(cells) > GOALS_LINE_IDX else '-'
-
+        score_m = re.match(r'(\d+-\d+)', score_raw_text); score_raw = score_m.group(1) if score_m else '?-?'
+        score_fmt = score_raw.replace('-', ':') if score_raw != '?-?' else '?:?' # MODIFICADO para usar ':'
+        ah_line_raw_text = cells[ah_idx].text.strip()
         ah_line_fmt = format_ah_as_decimal_string_of(ah_line_raw_text)
-
-        if not home or not away or not match_id:
-            return None
-            
-        return {
-            'home': home, 
-            'away': away, 
-            'score': score_fmt, 
-            'score_raw': score_raw,
-            'ahLine': ah_line_fmt, 
-            'ahLine_raw': ah_line_raw_text,
-            'goalLine': goal_line_raw_text, # <--- NUEVO CAMPO AÑADIDO
-            'matchIndex': match_id, 
-            'vs': row_element.get('vs'),
-            'league_id_hist': league_id_hist_attr
-        }
-    except (IndexError, AttributeError): 
-        # Si falla el acceso a una celda, ignora la fila.
-        return None
+        match_id = row_element.get('index')
+        if not home or not away: return None
+        return {'home': home, 'away': away, 'score': score_fmt, 'score_raw': score_raw,
+                'ahLine': ah_line_fmt, 'ahLine_raw': ah_line_raw_text,
+                'matchIndex': match_id, 'vs': row_element.get('vs'),
+                'league_id_hist': league_id_hist_attr}
+    except Exception: return None
 
 # --- SESIÓN Y FETCHING ---
 @st.cache_resource
@@ -523,7 +491,6 @@ def extract_final_score_of(soup):
     return '?:?', "?-?"
 
 # MODIFICADO: para devolver nombres del H2H general
-#HISTORICO DE LOS DOS EQUIPOS FUNCION
 def extract_h2h_data_of(soup, main_home_team_name, main_away_team_name, current_league_id):
     ah1, res1, res1_raw, match1_id = '-', '?:?', '?-?', None
     ah6, res6, res6_raw, match6_id = '-', '?:?', '?-?', None
@@ -771,162 +738,57 @@ def display_other_feature_ui():
                     st.caption("Estadísticas de progresión se mostrarán si el partido ha finalizado y hay marcador.")
 
 
-         # Usamos st.expander para crear un contenedor colapsable.
-# El primer argumento es el título que siempre estará visible.
-# expanded=False hace que empiece cerrado por defecto.
+            st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Reciente y H2H Indirecto</h3>", unsafe_allow_html=True)
+            rp_col1, rp_col2, rp_col3 = st.columns(3)
+            with rp_col1:
+                st.markdown(f"<h4 class='card-title'>Último <span class='home-color'>{display_home_name}</span> (Casa)</h4>", unsafe_allow_html=True)
+                if last_home_match_in_league_of:
+                    res = last_home_match_in_league_of
+                    st.markdown(f"🆚 <span class='away-color'>{res['away_team']}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
+                    formatted_ah_lh = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
+                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_lh if formatted_ah_lh != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+                    st.caption(f"📅 {res.get('date', 'N/A')}")
+                    display_previous_match_progression_stats(
+                        f"Últ. {res.get('home_team','L')} (C) vs {res.get('away_team','V')}",
+                        res.get('match_id'), res.get('home_team','Local'), res.get('away_team','Visitante')
+                    )
+                else: st.info(f"No se encontró último partido en casa para {display_home_name}.")
 
+            with rp_col2:
+                st.markdown(f"<h4 class='card-title'>Último <span class='away-color'>{display_away_name}</span> (Fuera)</h4>", unsafe_allow_html=True)
+                if last_away_match_in_league_of:
+                    res = last_away_match_in_league_of
+                    st.markdown(f"🆚 <span class='home-color'>{res['home_team']}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
+                    formatted_ah_la = format_ah_as_decimal_string_of(res.get('handicap_line_raw','-'))
+                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_la if formatted_ah_la != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+                    st.caption(f"📅 {res.get('date', 'N/A')}")
+                    display_previous_match_progression_stats(
+                        f"Últ. {res.get('away_team','V')} (F) vs {res.get('home_team','L')}",
+                        res.get('match_id'), res.get('home_team','Local'), res.get('away_team','Visitante')
+                    )
+                else: st.info(f"No se encontró último partido fuera para {display_away_name}.")
 
-import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import re # Importamos re para expresiones regulares
+            with rp_col3:
+                st.markdown(f"<h4 class='card-title'>🆚 H2H Rivales (Col3)</h4>", unsafe_allow_html=True)
+                details_h2h_col3_of = {"status": "error", "resultado": PLACEHOLDER_NODATA}
+                if key_match_id_for_rival_a_h2h and rival_a_id_orig_col3 and rival_b_id_orig_col3 and driver_actual_of:
+                    details_h2h_col3_of = get_h2h_details_for_original_logic_of(driver_actual_of, key_match_id_for_rival_a_h2h, rival_a_id_orig_col3, rival_b_id_orig_col3, rival_a_name_orig_col3, rival_b_name_orig_col3)
 
-# --- FUNCIÓN DE SCRAPING ---
-# Usamos el decorador de caché de Streamlit para no volver a descargar los datos
-# de un mismo partido si ya lo hemos hecho recientemente. Esto acelera mucho la app.
-@st.cache_data(ttl=3600) # Caché de 1 hora
-def get_match_odds_from_nowgoal(match_id):
-    """
-    Navega a la página de detalle del partido en nowgoal y extrae las líneas
-    iniciales de AH y O/U de Bet365.
-    """
-    if not match_id:
-        return {'handicap_line': '-', 'goal_line': '-'}
-
-    try:
-        url = f"https://live19.nowgoal25.com/match/h2h-{match_id}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers)
-        response.raise_for_status() # Lanza un error si la petición falla
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        # --- EXTRACCIÓN DE DATOS ---
-        # Buscamos la fila de Bet365 que corresponde a las cuotas iniciales ('earlyOdds')
-        bet365_row = soup.find('tr', {'id': 'tr_o_1_8', 'name': 'earlyOdds'})
-
-        if bet365_row:
-            cells = bet365_row.find_all('td')
-            # El Hándicap Asiático está en la 4ª celda (índice 3)
-            # La línea de goles (Over/Under) está en la 9ª celda (índice 8)
-            ah_line_raw = cells[3].text.strip() if len(cells) > 3 else '-'
-            goal_line_raw = cells[9].text.strip() if len(cells) > 9 else '-'
-            
-            # Limpiamos y formateamos el AH (si es necesario)
-            formatted_ah = format_ah_as_decimal_string_of(ah_line_raw)
-
-            return {
-                'handicap_line': formatted_ah,
-                'goal_line': goal_line_raw
-            }
-        else:
-            # Si no encontramos la fila, puede que los datos estén en una variable de JS
-            # Esto es un fallback, un poco más avanzado pero robusto
-            script_tags = soup.find_all('script')
-            for script in script_tags:
-                if script.string and 'Vs_hOdds' in script.string:
-                    # Usamos una expresión regular para encontrar la línea de Bet365 (id: 8) para este partido
-                    match_data_regex = re.compile(r"\[" + str(match_id) + r",8,.*?'(.*?)'.*?'(.*?)'.*?\]")
-                    found = match_data_regex.search(script.string)
-                    if found:
-                        ah_line_raw = found.group(1)
-                        goal_line_raw = found.group(2)
-                        formatted_ah = format_ah_as_decimal_string_of(ah_line_raw)
-                        return {
-                            'handicap_line': formatted_ah,
-                            'goal_line': goal_line_raw
-                        }
-
-            return {'handicap_line': 'N/A', 'goal_line': 'N/A'}
-
-    except Exception as e:
-        print(f"Error scraping match {match_id}: {e}")
-        return {'handicap_line': 'Error', 'goal_line': 'Error'}
-
-# (Asegúrate de tener tu función `format_ah_as_decimal_string_of` definida en alguna parte)
-# Ejemplo de la función que podrías tener:
-def format_ah_as_decimal_string_of(value):
-    # Esta es solo una suposición de tu función. Ajústala si es necesario.
-    return str(value)
-    # (Asegúrate de que las funciones get_match_odds_from_nowgoal y format_ah_as_decimal_string_of están definidas antes de este bloque)
-
-# Usamos st.expander para crear el contenedor colapsable
-with st.expander("⚡ Rendimiento Reciente y H2H Indirecto (Haz clic para ver)", expanded=False):
-
-    rp_col1, rp_col2, rp_col3 = st.columns(3)
-
-    # --- Columna 1 ---
-    with rp_col1:
-        st.markdown(f"<h4 class='card-title'>Último <span class='home-color'>{display_home_name}</span> (Casa)</h4>", unsafe_allow_html=True)
-        if last_home_match_in_league_of:
-            res = last_home_match_in_league_of
-            match_id_col1 = res.get('match_id')
-
-            # LLAMADA A LA FUNCIÓN DE SCRAPING
-            with st.spinner('Buscando cuotas...'):
-                odds_details_col1 = get_match_odds_from_nowgoal(match_id_col1)
-
-            st.markdown(f"🆚 <span class='away-color'>{res['away_team']}</span>", unsafe_allow_html=True)
-            st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
-            
-            st.markdown(f"**AH:** <span class='ah-value'>{odds_details_col1.get('handicap_line', '-')}</span>", unsafe_allow_html=True)
-            st.markdown(f"**O/U:** <span class='goal-line-value'>{odds_details_col1.get('goal_line', '-')}</span>", unsafe_allow_html=True)
-            
-            st.caption(f"📅 {res.get('date', 'N/A')}")
-            # ... (el resto de tu código para esta columna)
-        else: 
-            st.info(f"No se encontró último partido en casa.")
-
-    # --- Columna 2 ---
-    with rp_col2:
-        st.markdown(f"<h4 class='card-title'>Último <span class='away-color'>{display_away_name}</span> (Fuera)</h4>", unsafe_allow_html=True)
-        if last_away_match_in_league_of:
-            res = last_away_match_in_league_of
-            match_id_col2 = res.get('match_id')
-
-            # LLAMADA A LA FUNCIÓN DE SCRAPING
-            with st.spinner('Buscando cuotas...'):
-                odds_details_col2 = get_match_odds_from_nowgoal(match_id_col2)
-
-            st.markdown(f"🆚 <span class='home-color'>{res['home_team']}</span>", unsafe_allow_html=True)
-            st.markdown(f"<div style='margin-top: 8px; margin-bottom: 8px;'><span class='home-color'>{res['home_team']}</span> <span class='score-value'>{res['score'].replace('-',':')}</span> <span class='away-color'>{res['away_team']}</span></div>", unsafe_allow_html=True)
-            
-            st.markdown(f"**AH:** <span class='ah-value'>{odds_details_col2.get('handicap_line', '-')}</span>", unsafe_allow_html=True)
-            st.markdown(f"**O/U:** <span class='goal-line-value'>{odds_details_col2.get('goal_line', '-')}</span>", unsafe_allow_html=True)
-            
-            st.caption(f"📅 {res.get('date', 'N/A')}")
-            # ... (el resto de tu código para esta columna)
-        else: 
-            st.info(f"No se encontró último partido fuera.")
-
-    # --- Columna 3 ---
-    with rp_col3:
-        st.markdown(f"<h4 class='card-title'>🆚 H2H Rivales (Col3)</h4>", unsafe_allow_html=True)
-        # ... (Tu código para obtener 'details_h2h_col3_of' se mantiene)
-        
-        if details_h2h_col3_of.get("status") == "found":
-            res_h2h = details_h2h_col3_of
-            match_id_col3 = res_h2h.get('match_id')
-
-            # LLAMADA A LA FUNCIÓN DE SCRAPING
-            with st.spinner('Buscando cuotas...'):
-                odds_details_col3 = get_match_odds_from_nowgoal(match_id_col3)
-
-            h2h_home_name_col3 = res_h2h.get('h2h_home_team_name', 'Local')
-            h2h_away_name_col3 = res_h2h.get('h2h_away_team_name', 'Visitante')
-            st.markdown(f"<span class='home-color'>{h2h_home_name_col3}</span> <span class='score-value'>{res_h2h.get('goles_home', '?')}:{res_h2h.get('goles_away', '?')}</span> <span class='away-color'>{h2h_away_name_col3}</span>", unsafe_allow_html=True)
-            
-            st.markdown(f"**AH:** <span class='ah-value'>{odds_details_col3.get('handicap_line', '-')}</span>", unsafe_allow_html=True)
-            st.markdown(f"**O/U:** <span class='goal-line-value'>{odds_details_col3.get('goal_line', '-')}</span>", unsafe_allow_html=True)
-            
-            # ... (el resto de tu código para esta columna)
-        else: 
-            st.info("H2H no encontrado.")
-            
-    st.divider()
-
+                if details_h2h_col3_of.get("status") == "found":
+                    res_h2h = details_h2h_col3_of
+                    h2h_home_name_col3 = res_h2h.get('h2h_home_team_name', 'Local H2H')
+                    h2h_away_name_col3 = res_h2h.get('h2h_away_team_name', 'Visitante H2H')
+                    st.markdown(f"<span class='home-color'>{h2h_home_name_col3}</span> <span class='score-value'>{res_h2h.get('goles_home', '?')}:{res_h2h.get('goles_away', '?')}</span> <span class='away-color'>{h2h_away_name_col3}</span>", unsafe_allow_html=True)
+                    formatted_ah_h2h_col3 = format_ah_as_decimal_string_of(res_h2h.get('handicap','-'))
+                    st.markdown(f"**AH:** <span class='ah-value'>{formatted_ah_h2h_col3 if formatted_ah_h2h_col3 != '-' else PLACEHOLDER_NODATA}</span>", unsafe_allow_html=True)
+                    display_previous_match_progression_stats(
+                        f"H2H Col3: {h2h_home_name_col3} vs {h2h_away_name_col3}",
+                        res_h2h.get('match_id'), h2h_home_name_col3, h2h_away_name_col3
+                    )
+                else: st.info(details_h2h_col3_of.get('resultado', f"H2H Col3 entre {rival_a_name_orig_col3 or 'RivalA'} y {rival_b_name_orig_col3 or 'RivalB'} no encontrado."))
+            st.divider()
 
             with st.expander("🔁 Comparativas Indirectas Detalladas", expanded=False): # MODIFICADO: expanded=False por defecto
                 comp_col1, comp_col2 = st.columns(2)
@@ -966,7 +828,7 @@ with st.expander("⚡ Rendimiento Reciente y H2H Indirecto (Haz clic para ver)",
             with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=False): # MODIFICADO: expanded=False por defecto
                 h2h_direct_col1, h2h_direct_col2 = st.columns(2)
                 with h2h_direct_col1:
-                    st.metric("HANDICAP EN CASA)", col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA)
+                    st.metric("AH H2H (Local en Casa)", col_data["AH_H2H_V"] if col_data["AH_H2H_V"] != '-' else PLACEHOLDER_NODATA)
                     st.metric("Res H2H (Local en Casa)", col_data["Res_H2H_V"].replace("*",":") if col_data["Res_H2H_V"] != '?:?' else PLACEHOLDER_NODATA)
                     if match1_id_h2h_v:
                         display_previous_match_progression_stats(
