@@ -910,7 +910,7 @@ def display_other_feature_ui():
             st.divider()
 
             # --- INICIO DE LA NUEVA SECCIÓN ---
-            with st.expander("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Último Partido (General) y H2H Indirecto</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Último Partido (General) y H2H Indirecto</h3>", unsafe_allow_html=True)
             rp_gen_col1, rp_gen_col2, rp_gen_col3 = st.columns(3)
             with rp_gen_col1:
                 st.markdown(f"<h4 class='card-title'>Último General <span class='home-color'>{display_home_name}</span></h4>", unsafe_allow_html=True)
