@@ -337,6 +337,82 @@ def get_h2h_details_for_original_logic_of(driver_instance, key_match_id_for_h2h_
                     "match_id": match_id_h2h_rivals}
 
     return {"status": "not_found", "resultado": f"H2H directo no encontrado para {rival_a_name} vs {rival_b_name} en historial (table_v2) de la página de ref. ({key_match_id_for_h2h_url})."}
+def get_h2h_details_for_original_logic_of_FIX(driver_instance, key_match_id_for_h2h_url, rival_a_id, rival_b_id, rival_a_name="Rival A", rival_b_name="Rival B"):
+    if not driver_instance:
+        return {"status": "error", "resultado": "N/A (Driver no disponible H2H OF)"}
+    if not key_match_id_for_h2h_url or not rival_a_id or not rival_b_id:
+        return {"status": "error", "resultado": f"N/A (IDs incompletos para H2H {rival_a_name} vs {rival_b_name})"}
+
+    url_to_visit = f"{BASE_URL_OF}/match/h2h-{key_match_id_for_h2h_url}"
+    try:
+        driver_instance.get(url_to_visit)
+        WebDriverWait(driver_instance, SELENIUM_TIMEOUT_SECONDS_OF, poll_frequency=SELENIUM_POLL_FREQUENCY_OF).until(
+            EC.presence_of_element_located((By.ID, "table_v2")))
+        time.sleep(0.7)
+        soup_selenium = BeautifulSoup(driver_instance.page_source, "html.parser")
+    except TimeoutException:
+        return {"status": "error", "resultado": f"N/A (Timeout esperando table_v2 en {url_to_visit})"}
+    except Exception as e:
+        return {"status": "error", "resultado": f"N/A (Error Selenium en {url_to_visit}: {type(e).__name__})"}
+
+    if not soup_selenium:
+        return {"status": "error", "resultado": f"N/A (Fallo soup Selenium H2H Original OF en {url_to_visit})"}
+
+    table_to_search_h2h = soup_selenium.find("table", id="table_v2")
+    if not table_to_search_h2h:
+        return {"status": "error", "resultado": f"N/A (Tabla v2 para H2H no encontrada en {url_to_visit})"}
+
+    for row in table_to_search_h2h.find_all("tr", id=re.compile(r"tr2_\d+")):
+        # ✅ Corrección aquí: buscar solo los enlaces a equipos
+        team_links = []
+        for a in row.find_all("a", onclick=True):
+            if "team(" in a.get("onclick", ""):
+                team_links.append(a)
+
+        if len(team_links) < 2:
+            continue
+
+        h2h_row_home_id_m = re.search(r"team\((\d+)\)", team_links[0].get("onclick", ""))
+        h2h_row_away_id_m = re.search(r"team\((\d+)\)", team_links[1].get("onclick", ""))
+        if not h2h_row_home_id_m or not h2h_row_away_id_m:
+            continue
+
+        h2h_row_home_id = h2h_row_home_id_m.group(1)
+        h2h_row_away_id = h2h_row_away_id_m.group(1)
+
+        # Comprobamos si los IDs coinciden con nuestros rivales
+        if {h2h_row_home_id, h2h_row_away_id} == {str(rival_a_id), str(rival_b_id)}:
+            score_span = row.find("span", class_="fscore_2")
+            if not score_span or not score_span.text or "-" not in score_span.text:
+                continue
+            score_val = score_span.text.strip().split("(")[0].strip()
+            g_h, g_a = score_val.split("-", 1)
+
+            tds = row.find_all("td")
+            handicap_raw = "N/A"
+            HANDICAP_TD_IDX = 11
+            if len(tds) > HANDICAP_TD_IDX:
+                cell = tds[HANDICAP_TD_IDX]
+                d_o = cell.get("data-o")
+                handicap_raw = d_o.strip() if d_o and d_o.strip() not in ["", "-"] else (
+                    cell.text.strip() if cell.text.strip() not in ["", "-"] else "N/A"
+                )
+
+            match_id_h2h_rivals = row.get('index')
+            rol_a_in_this_h2h = "H" if h2h_row_home_id == str(rival_a_id) else "A"
+
+            return {
+                "status": "found",
+                "goles_home": g_h.strip(),
+                "goles_away": g_a.strip(),
+                "handicap": handicap_raw,
+                "rol_rival_a": rol_a_in_this_h2h,
+                "h2h_home_team_name": team_links[0].text.strip(),
+                "h2h_away_team_name": team_links[1].text.strip(),
+                "match_id": match_id_h2h_rivals
+            }
+
+    return {"status": "not_found", "resultado": f"H2H directo no encontrado para {rival_a_name} vs {rival_b_name} en historial (table_v2) de la página de ref. ({key_match_id_for_h2h_url})."}
 
 def get_team_league_info_from_script_of(soup):
     home_id, away_id, league_id, home_name, away_name, league_name = (None,)*3 + ("N/A",)*3
@@ -957,7 +1033,7 @@ def display_other_feature_ui():
                     rival_b_name = last_overall_away_team_match.get('opponent_name')
                     
                     if key_match and rival_a_id and rival_b_id and rival_a_name and rival_b_name:
-                         details_h2h_new_sec = get_h2h_details_for_original_logic_of(driver_actual_of, key_match, rival_a_id, rival_b_id, rival_a_name, rival_b_name)
+                         details_h2h_new_sec = get_h2h_details_for_original_logic_of_FIX(driver_actual_of, key_match, rival_a_id, rival_b_id, rival_a_name, rival_b_name)
                     else:
                         details_h2h_new_sec['resultado'] = "Faltan IDs de rivales para buscar H2H."
 
