@@ -14,6 +14,13 @@ import math
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+st.set_page_config(
+    layout="wide",
+    page_title="Análisis Avanzado de Partidos",
+    initial_sidebar_state="expanded"
+)
+
+
 # --- PASO 2: CONFIGURACIÓN GLOBAL ---
 BASE_URL_OF = "https://live18.nowgoal25.com"
 PLACEHOLDER_NODATA = "*(No disponible)*"
