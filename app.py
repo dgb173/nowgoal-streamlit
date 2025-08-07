@@ -4,8 +4,7 @@ import streamlit as st
 from modules.datos import display_other_feature_ui
 from modules.estudio import display_other_feature_ui2
 
-from modules.kimi_chat import display_kimi_chat_ui
-from modules.extractorids import display_scraper_ui  # <--- 1. IMPORTA LA NUEVA FUNCIÓN
+
 
 def main():
     st.set_page_config(
@@ -24,8 +23,6 @@ def main():
     
     tool_options = (
         "Local Y Visitante",
-        "Ids Proximos Partidos",
-        "Chat con Kimi K2",
         "Entreno"
     )
     
@@ -38,13 +35,6 @@ def main():
     # Ahora las condiciones coincidirán perfectamente con las opciones
     if selected_tool == "Local Y Visitante":
         display_other_feature_ui()
-    
-    # 2. AÑADE ESTE BLOQUE ELIF PARA LA NUEVA HERRAMIENTA
-    elif selected_tool == "Ids Proximos Partidos":
-        display_scraper_ui() # Llama a la función de la interfaz del scraper
-        
-    elif selected_tool == "Chat con Kimi K2":
-        display_kimi_chat_ui()
     elif selected_tool == "Entreno":
         display_other_feature_ui2()
 
