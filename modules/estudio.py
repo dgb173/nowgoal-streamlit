@@ -557,15 +557,14 @@ def _parse_date_ddmmyyyy(d: str) -> tuple:
         return (1900, 1, 1)
     return (int(m.group(3)), int(m.group(2)), int(m.group(1)))
 
+# Reemplaza esta función completa en tu archivo estudio.py
+
 def extract_h2h_data_of(soup, main_home_team_name, main_away_team_name, current_league_id=None):
     """
     Devuelve:
-      ah1, res1, res1_raw, match1_id,
-      ah6, res6, res6_raw, match6_id,
-      h2h_gen_home_name, h2h_gen_away_name
-
-    - NO filtra por liga cuando current_league_id es None (recomendado).
-    - El 'último partido en casa' del local se elige por fecha (más reciente).
+      ah1, res1, res1_raw, match1_id (para el H2H con el local en casa),
+      ah6, res6, res6_raw, match6_id (para el H2H MÁS RECIENTE, sin importar localía),
+      h2h_gen_home_name, h2h_gen_away_name (nombres del H2H más reciente).
     """
     ah1, res1, res1_raw, match1_id = '-', '?:?', '?-?', None
     ah6, res6, res6_raw, match6_id = '-', '?:?', '?-?', None
@@ -578,40 +577,43 @@ def extract_h2h_data_of(soup, main_home_team_name, main_away_team_name, current_
     if not h2h_table:
         return ah1, res1, res1_raw, match1_id, ah6, res6, res6_raw, match6_id, h2h_gen_home_name, h2h_gen_away_name
 
+    # 1. Extraer todos los partidos H2H de la tabla
+    all_h2h_matches = []
     rows = h2h_table.find_all("tr", id=re.compile(r"tr3_\d+"))
-    details_list = []
     for r in rows:
         d = get_match_details_from_row_of(r, score_class_selector='fscore_3', source_table_type='h2h')
         if not d:
             continue
+        # Filtro opcional por liga
         if current_league_id and d.get('league_id_hist') and d.get('league_id_hist') != str(current_league_id):
-            # Si se pasa liga, filtra; si es None, NO filtra
             continue
-        details_list.append(d)
+        all_h2h_matches.append(d)
 
-    if not details_list:
+    if not all_h2h_matches:
         return ah1, res1, res1_raw, match1_id, ah6, res6, res6_raw, match6_id, h2h_gen_home_name, h2h_gen_away_name
 
-    # H2H directo: local principal vs visitante principal
-    for d in details_list:
+    # 2. Ordenar todos los partidos por fecha para asegurar que el primero es el más reciente
+    all_h2h_matches.sort(key=lambda x: _parse_date_ddmmyyyy(x.get('date', '')), reverse=True)
+
+    # 3. <<< CAMBIO CLAVE: Obtener el H2H General (el más reciente de todos)
+    #    Esta es la lógica correcta de `datos.py`, pero mejorada con ordenación explícita.
+    most_recent_h2h = all_h2h_matches[0]
+    ah6 = most_recent_h2h.get('ahLine', '-')
+    res6 = most_recent_h2h.get('score', '?:?')
+    res6_raw = most_recent_h2h.get('score_raw', '?-?')
+    match6_id = most_recent_h2h.get('matchIndex')
+    h2h_gen_home_name = most_recent_h2h.get('home', h2h_gen_home_name)
+    h2h_gen_away_name = most_recent_h2h.get('away', h2h_gen_away_name)
+
+    # 4. <<< CAMBIO CLAVE: Buscar el H2H específico (local en casa) dentro de la lista ya ordenada
+    #    La lógica original para esto estaba bien, pero la aplicamos a la lista ordenada.
+    for d in all_h2h_matches:
         if d['home'].lower() == main_home_team_name.lower() and d['away'].lower() == main_away_team_name.lower():
             ah1 = d.get('ahLine', '-')
             res1 = d.get('score', '?:?')
             res1_raw = d.get('score_raw', '?-?')
             match1_id = d.get('matchIndex')
-            break
-
-    # Último partido (por fecha) donde el local principal jugó EN CASA (cualquier rival, cualquier liga si current_league_id=None)
-    home_rows = [d for d in details_list if d['home'].lower() == main_home_team_name.lower()]
-    if home_rows:
-        home_rows.sort(key=lambda x: _parse_date_ddmmyyyy(x.get('date', '')), reverse=True)
-        last_home = home_rows[0]
-        ah6 = last_home.get('ahLine', '-')
-        res6 = last_home.get('score', '?:?')
-        res6_raw = last_home.get('score_raw', '?-?')
-        match6_id = last_home.get('matchIndex')
-        h2h_gen_home_name = last_home.get('home', h2h_gen_home_name)
-        h2h_gen_away_name = last_home.get('away', h2h_gen_away_name)
+            break # Encontramos el más reciente con el local en casa, no necesitamos seguir.
 
     return ah1, res1, res1_raw, match1_id, ah6, res6, res6_raw, match6_id, h2h_gen_home_name, h2h_gen_away_name
 def extract_comparative_match_of(soup_for_team_history, table_id_of_team_to_search, team_name_to_find_match_for, opponent_name_to_search, current_league_id, is_home_table):
