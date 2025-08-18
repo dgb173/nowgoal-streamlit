@@ -23,7 +23,7 @@ SELENIUM_TIMEOUT_SECONDS_OF = 10
 SELENIUM_POLL_FREQUENCY_OF = 0.2
 PLACEHOLDER_NODATA = "*(No disponible)*"
 
-# --- FUNCIONES HELPER PARA PARSEO Y FORMATEO ---
+# --- FUNCIONES HELPER PARA PARSEO Y FORMATEO (LÓGICA CORREGIDA) ---
 def parse_ah_to_number_of(ah_line_str: str):
     if not isinstance(ah_line_str, str): return None
     s = ah_line_str.strip().replace(' ', '')
@@ -34,10 +34,8 @@ def parse_ah_to_number_of(ah_line_str: str):
             parts = s.split('/')
             if len(parts) != 2: return None
             p1_str, p2_str = parts[0], parts[1]
-            try: val1 = float(p1_str)
-            except ValueError: return None
-            try: val2 = float(p2_str)
-            except ValueError: return None
+            val1 = float(p1_str)
+            val2 = float(p2_str)
             if val1 < 0 and not p2_str.startswith('-') and val2 > 0:
                  val2 = -abs(val2)
             elif original_starts_with_minus and val1 == 0.0 and \
@@ -47,9 +45,9 @@ def parse_ah_to_number_of(ah_line_str: str):
             return (val1 + val2) / 2.0
         else:
             return float(s)
-    except ValueError:
+    except (ValueError, IndexError):
         return None
-        
+
 def format_ah_as_decimal_string_of(ah_line_str: str, for_sheets=False):
     if not isinstance(ah_line_str, str) or not ah_line_str.strip() or ah_line_str.strip() in ['-', '?']:
         return ah_line_str.strip() if isinstance(ah_line_str, str) and ah_line_str.strip() in ['-','?'] else '-'
@@ -308,21 +306,38 @@ def extract_last_match_in_league_of(soup, table_id, team_name, league_id, is_hom
         "handicap_line_raw": last_match.get('ahLine_raw', 'N/A'), "match_id": last_match.get('matchIndex')
     }
 
-def get_main_match_odds_selenium_of(driver):
-    odds = {"ah_linea_raw": "N/A", "goals_linea_raw": "N/A"}
-    try:
-        wait = WebDriverWait(driver, 5, poll_frequency=0.2)
-        bet365_row = None
-        try: bet365_row = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "tr#tr_o_1_8[name='earlyOdds']")))
-        except TimeoutException: bet365_row = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "tr#tr_o_1_31[name='earlyOdds']")))
+# --- NUEVA FUNCIÓN DE EXTRACCIÓN DE CUOTAS ---
+def extract_bet365_initial_odds_of(soup):
+    """
+    Extrae un diccionario completo con las cuotas iniciales de Bet365 usando BeautifulSoup.
+    """
+    odds_info = {
+        "ah_home_cuota": "N/A", "ah_linea_raw": "N/A", "ah_away_cuota": "N/A",
+        "goals_over_cuota": "N/A", "goals_linea_raw": "N/A", "goals_under_cuota": "N/A"
+    }
+    if not soup:
+        return odds_info
+
+    # Busca la fila de Bet365 por sus posibles IDs
+    bet365_row = soup.select_one("tr#tr_o_1_8[name='earlyOdds'], tr#tr_o_1_31[name='earlyOdds']")
+    
+    if not bet365_row:
+        return odds_info
+
+    tds = bet365_row.find_all("td")
+    
+    if len(tds) >= 11:
+        # Extraer datos de Handicap Asiático
+        odds_info["ah_home_cuota"] = tds[2].get("data-o", tds[2].text).strip()
+        odds_info["ah_linea_raw"] = tds[3].get("data-o", tds[3].text).strip()
+        odds_info["ah_away_cuota"] = tds[4].get("data-o", tds[4].text).strip()
         
-        if bet365_row:
-            tds = bet365_row.find_elements(By.TAG_NAME, "td")
-            if len(tds) >= 11:
-                odds["ah_linea_raw"] = tds[3].get_attribute("data-o") or tds[3].text.strip() or "N/A"
-                odds["goals_linea_raw"] = tds[9].get_attribute("data-o") or tds[9].text.strip() or "N/A"
-    except Exception: pass
-    return odds
+        # Extraer datos de Goles (Over/Under)
+        odds_info["goals_over_cuota"] = tds[8].get("data-o", tds[8].text).strip()
+        odds_info["goals_linea_raw"] = tds[9].get("data-o", tds[9].text).strip()
+        odds_info["goals_under_cuota"] = tds[10].get("data-o", tds[10].text).strip()
+        
+    return odds_info
 
 def extract_standings_data_from_h2h_page_of(soup, team_name):
     data = {"name": team_name, "ranking": "N/A", "total_pj": "N/A", "total_v": "N/A", "total_e": "N/A", "total_d": "N/A", "total_gf": "N/A", "total_gc": "N/A", "specific_pj": "N/A", "specific_v": "N/A", "specific_e": "N/A", "specific_d": "N/A", "specific_gf": "N/A", "specific_gc": "N/A", "specific_type": "N/A"}
@@ -466,7 +481,6 @@ def display_other_feature_ui2():
         with st.spinner("🧠 Procesando datos y realizando análisis en paralelo..."):
             home_id, away_id, league_id, home_name, away_name, _ = get_team_league_info_from_script_of(soup_completo)
             
-            # --- Extracciones rápidas de la Sopa principal ---
             home_standings = extract_standings_data_from_h2h_page_of(soup_completo, home_name)
             away_standings = extract_standings_data_from_h2h_page_of(soup_completo, away_name)
             key_match_id_rival_a, rival_a_id, rival_a_name = get_rival_a_for_original_h2h_of(soup_completo)
@@ -477,20 +491,13 @@ def display_other_feature_ui2():
             comp_L_vs_UV_A = extract_comparative_match_of(soup_completo, "table_v1", home_name, (last_away_match or {}).get('home_team'), league_id, True)
             comp_V_vs_UL_H = extract_comparative_match_of(soup_completo, "table_v2", away_name, (last_home_match or {}).get('away_team'), league_id, False)
             final_score, _ = extract_final_score_of(soup_completo)
+            
+            # Usar la nueva función para extraer todas las cuotas a la vez
+            main_match_odds_data = extract_bet365_initial_odds_of(soup_completo)
 
-            # --- Operaciones lentas (red/Selenium) en paralelo ---
             with ThreadPoolExecutor(max_workers=8) as executor:
-                future_odds = executor.submit(get_main_match_odds_selenium_of, driver)
+                # La extracción de cuotas ya no es necesaria aquí
                 future_h2h_col3 = executor.submit(get_h2h_details_for_original_logic_of, driver, key_match_id_rival_a, rival_a_id, rival_b_id, rival_a_name, rival_b_name)
-                
-                match_ids_for_stats = {
-                    'last_home': (last_home_match or {}).get('match_id'), 'last_away': (last_away_match or {}).get('match_id'),
-                    'h2h_v': h2h_data['match1_id'], 'h2h_g': h2h_data['match6_id'],
-                    'comp_L': (comp_L_vs_UV_A or {}).get('match_id'), 'comp_V': (comp_V_vs_UL_H or {}).get('match_id')
-                }
-                future_stats = {key: executor.submit(get_match_progression_stats_data, mid) for key, mid in match_ids_for_stats.items() if mid}
-                
-                odds_data = future_odds.result()
                 details_h2h_col3 = future_h2h_col3.result()
 
             # --- RENDERIZACIÓN DE LA UI ---
@@ -500,19 +507,14 @@ def display_other_feature_ui2():
             with st.expander("📊 Clasificación en Liga", expanded=True):
                 scol1, scol2 = st.columns(2)
                 
-                # --- FUNCIÓN INTERNA PARA MOSTRAR CLASIFICACIÓN (CORREGIDA) ---
                 def display_standings(col, data, team_color_class):
                     with col:
                         st.markdown(f"<h4 class='card-title' style='text-align: center;'><span class='{team_color_class}'>{data['name']}</span></h4>", unsafe_allow_html=True)
                         if data and data['ranking'] != 'N/A':
                             st.markdown(f"<p style='text-align: center;'><strong>Posición:</strong> <span class='data-highlight'>{data['ranking']}</span></p>", unsafe_allow_html=True)
-                            
                             st.markdown("<h6>Estadísticas Totales</h6>", unsafe_allow_html=True)
-                            # CORRECCIÓN: Usar Markdown nativo para evitar problemas de renderizado de HTML
                             st.markdown(f"**PJ:** {data['total_pj']} | **V-E-D:** {data['total_v']}-{data['total_e']}-{data['total_d']} | **GF:GC:** {data['total_gf']}:{data['total_gc']}")
-
                             st.markdown(f"<h6>{data.get('specific_type', 'Específicas')}</h6>", unsafe_allow_html=True)
-                            # CORRECCIÓN: Usar Markdown nativo
                             st.markdown(f"**PJ:** {data['specific_pj']} | **V-E-D:** {data['specific_v']}-{data['specific_e']}-{data['specific_d']} | **GF:GC:** {data['specific_gf']}:{data['specific_gc']}")
                         else:
                             st.info("Datos de clasificación no disponibles.")
@@ -521,10 +523,22 @@ def display_other_feature_ui2():
                 display_standings(scol2, away_standings, "away-color")
 
             st.markdown("<h2 class='section-header'>🎯 Análisis Detallado del Partido</h2>", unsafe_allow_html=True)
+            
+            # Bloque de UI mejorado con st.metric y nuevas variables
             with st.expander("⚖️ Cuotas Iniciales (Bet365) y Marcador Final", expanded=True):
                 o_col1, o_col2 = st.columns(2)
-                o_col1.metric("AH (Línea Inicial)", format_ah_as_decimal_string_of(odds_data.get('ah_linea_raw', '?')))
-                o_col2.metric("Goles (Línea Inicial)", format_ah_as_decimal_string_of(odds_data.get('goals_linea_raw', '?')))
+               
+                o_col1.metric(
+                    "AH (Línea Inicial)",
+                    format_ah_as_decimal_string_of(main_match_odds_data.get('ah_linea_raw', '?')) or PLACEHOLDER_NODATA,
+                    f"L: {main_match_odds_data.get('ah_home_cuota', '-')} / V: {main_match_odds_data.get('ah_away_cuota', '-')}"
+                )
+                
+                o_col2.metric(
+                    "Goles (Línea Inicial)",
+                    format_ah_as_decimal_string_of(main_match_odds_data.get('goals_linea_raw', '?')) or PLACEHOLDER_NODATA,
+                    f"Más: {main_match_odds_data.get('goals_over_cuota', '-')} / Menos: {main_match_odds_data.get('goals_under_cuota', '-')}"
+                )
 
             st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Reciente y H2H Indirecto</h3>", unsafe_allow_html=True)
             rp_col1, rp_col2, rp_col3 = st.columns(3)
