@@ -588,12 +588,12 @@ def display_other_feature_ui2():
             with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
                 h2h_col1, h2h_col2 = st.columns(2)
                 with h2h_col1:
-                    st.metric("Ultimo partido entre estos equipos en este estadio", h2h_data['ah1'] if h2h_data['ah1'] != '-' else PLACEHOLDER_NODATA)
+                    st.metric("Handicap del ultimo partido entre estos equipos en este estadio", h2h_data['ah1'] if h2h_data['ah1'] != '-' else PLACEHOLDER_NODATA)
                     st.metric("Resultado entre estos dos equipos en este estadio", h2h_data['res1'] if h2h_data['res1'] != '?:?' else PLACEHOLDER_NODATA)
                     if h2h_data['match1_id']:
                         display_previous_match_progression_stats(f"H2H: {home_name} (C) vs {away_name}", h2h_data['match1_id'], home_name, away_name)
                 with h2h_col2:
-                    st.metric("Ultimo partido entre ellos sea donde sea", h2h_data['ah6'] if h2h_data['ah6'] != '-' else PLACEHOLDER_NODATA)
+                    st.metric("Handicap del ultimo partido entre ellos sea donde sea", h2h_data['ah6'] if h2h_data['ah6'] != '-' else PLACEHOLDER_NODATA)
                     st.metric("Resultado ultimo partido entre ellos sea donde sea", h2h_data['res6'] if h2h_data['res6'] != '?:?' else PLACEHOLDER_NODATA)
                     if h2h_data['match6_id']:
                         display_previous_match_progression_stats(f"H2H Gen: {h2h_data['h2h_gen_home']} vs {h2h_data['h2h_gen_away']}", h2h_data['match6_id'], h2h_data['h2h_gen_home'], h2h_data['h2h_gen_away'])
