@@ -8,7 +8,7 @@ from modules.estudio import display_other_feature_ui2
 
 def main():
     st.set_page_config(
-        page_title="Nowgoal Data Scraper & Tools",
+        page_title="Con este programa me hare abundante!!!",
         page_icon="⚽",
         layout="wide",
         initial_sidebar_state="expanded"
