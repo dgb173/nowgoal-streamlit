@@ -538,7 +538,6 @@ def display_other_feature_ui2():
                     "Goles (Línea Inicial)",
                     format_ah_as_decimal_string_of(main_match_odds_data.get('goals_linea_raw', '?')) or PLACEHOLDER_NODATA)
 
-
             st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Reciente y H2H Indirecto</h3>", unsafe_allow_html=True)
             rp_col1, rp_col2, rp_col3 = st.columns(3)
             with rp_col1:
@@ -586,16 +585,16 @@ def display_other_feature_ui2():
                 display_comp(comp_col2, title2, comp_V_vs_UL_H, away_name)
 
             st.divider()
-         with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
+            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
                 h2h_col1, h2h_col2 = st.columns(2)
                 with h2h_col1:
-                    st.metric("Ultimo partido entre los dos equipos en este estadio", h2h_data['ah1'] if h2h_data['ah1'] != '-' else PLACEHOLDER_NODATA)
-                    st.metric("Resultado del ultimo partido entre los dos equipos en este estadio", h2h_data['res1'] if h2h_data['res1'] != '?:?' else PLACEHOLDER_NODATA)
+                    st.metric("AH H2H (Local en Casa)", h2h_data['ah1'] if h2h_data['ah1'] != '-' else PLACEHOLDER_NODATA)
+                    st.metric("Res H2H (Local en Casa)", h2h_data['res1'] if h2h_data['res1'] != '?:?' else PLACEHOLDER_NODATA)
                     if h2h_data['match1_id']:
                         display_previous_match_progression_stats(f"H2H: {home_name} (C) vs {away_name}", h2h_data['match1_id'], home_name, away_name)
                 with h2h_col2:
-                    st.metric("Ultimo Enfrentamiento entre ellos", h2h_data['ah6'] if h2h_data['ah6'] != '-' else PLACEHOLDER_NODATA)
-                    st.metric("Resultado ultimo enfrentamiento entre ellos", h2h_data['res6'] if h2h_data['res6'] != '?:?' else PLACEHOLDER_NODATA)
+                    st.metric("AH H2H (Último General)", h2h_data['ah6'] if h2h_data['ah6'] != '-' else PLACEHOLDER_NODATA)
+                    st.metric("Res H2H (Último General)", h2h_data['res6'] if h2h_data['res6'] != '?:?' else PLACEHOLDER_NODATA)
                     if h2h_data['match6_id']:
                         display_previous_match_progression_stats(f"H2H Gen: {h2h_data['h2h_gen_home']} vs {h2h_data['h2h_gen_away']}", h2h_data['match6_id'], h2h_data['h2h_gen_home'], h2h_data['h2h_gen_away'])
             
