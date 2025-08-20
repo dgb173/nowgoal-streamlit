@@ -1,7 +1,7 @@
 # Fichero: app.py (CORREGIDO Y ACTUALIZADO)
 
 import streamlit as st
-# from modules.datos import display_other_feature_ui
+from modules.datos import display_other_feature_ui
 from modules.estudio import display_other_feature_ui2
 
 
@@ -22,7 +22,8 @@ def main():
     st.sidebar.header("🛠️ Herramientas Disponibles")
     
     tool_options = (
-        "Entreno"
+        "Entreno",
+        "Analisis"
     )
     
     selected_tool = st.sidebar.radio(
@@ -34,6 +35,8 @@ def main():
     # Ahora las condiciones coincidirán perfectamente con las opciones
     if selected_tool == "Entreno":
         display_other_feature_ui2()
+    elif selected_tool == "Analisis":
+        display_other_feature_ui() 
 
 if __name__ == "__main__":
     main()
