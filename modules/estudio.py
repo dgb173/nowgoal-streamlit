@@ -585,19 +585,41 @@ def display_other_feature_ui2():
                 display_comp(comp_col2, title2, comp_V_vs_UL_H, away_name)
 
             st.divider()
-            with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
-                h2h_col1, h2h_col2 = st.columns(2)
-                with h2h_col1:
-                    st.metric("Handicap del ultimo partido entre estos equipos en este estadio", h2h_data['ah1'] if h2h_data['ah1'] != '-' else PLACEHOLDER_NODATA)
-                    st.metric("Resultado entre estos dos equipos en este estadio", h2h_data['res1'] if h2h_data['res1'] != '?:?' else PLACEHOLDER_NODATA)
-                    if h2h_data['match1_id']:
-                        display_previous_match_progression_stats(f"H2H: {home_name} (C) vs {away_name}", h2h_data['match1_id'], home_name, away_name)
-                with h2h_col2:
-                    st.metric("Handicap del ultimo partido entre ellos sea donde sea", h2h_data['ah6'] if h2h_data['ah6'] != '-' else PLACEHOLDER_NODATA)
-                    st.metric("Resultado ultimo partido entre ellos sea donde sea", h2h_data['res6'] if h2h_data['res6'] != '?:?' else PLACEHOLDER_NODATA)
-                    if h2h_data['match6_id']:
-                        display_previous_match_progression_stats(f"H2H Gen: {h2h_data['h2h_gen_home']} vs {h2h_data['h2h_gen_away']}", h2h_data['match6_id'], h2h_data['h2h_gen_home'], h2h_data['h2h_gen_away'])
-            
+            with st.expander("🔰 Enfrentamientos directos entre lso equipos", expanded=True):
+                    h2h_col1, h2h_col2 = st.columns(2)
+
+                    # --- Columna 1: H2H con el equipo local jugando en casa ---
+                    with h2h_col1:
+                        st.markdown(f"<h4 class='card-title'>Ultimo partido entre ellos en este estadio (<span class='home-color'>{home_name}</span> Casa)</h4>", unsafe_allow_html=True)
+                        if h2h_data['res1'] != '?:?':
+                            # Replicamos la estructura visual que te gusta
+                            st.markdown(f"<div style='margin: 8px 0;'><span class='home-color'>{home_name}</span> <span class='score-value'>{h2h_data['res1']}</span> <span class='away-color'>{away_name}</span></div>", unsafe_allow_html=True)
+                            st.markdown(f"**Handicap Inicial:** <span class='ah-value'>{h2h_data['ah1']}</span>", unsafe_allow_html=True)
+                            
+                            # Mostramos las estadísticas detalladas si existen
+                            if h2h_data['match1_id']:
+                                display_previous_match_progression_stats(f"H2H: {home_name} (C) vs {away_name}", h2h_data['match1_id'], home_name, away_name)
+                        else:
+                            st.info(f"No se encontró H2H con {home_name} en casa.")
+
+                    # --- Columna 2: Último H2H General, sin importar la localía ---
+                    with h2h_col2:
+                        st.markdown(f"<h4 class='card-title'>Ultimo partido entre ellos es decir en el estadio de <span class='away-color'>{away_name}</span> </h4>", unsafe_allow_html=True)
+                        if h2h_data['res6'] != '?:?':
+                            # Asignamos los nombres de los equipos de ese partido específico
+                            h_gen_name = h2h_data['h2h_gen_home']
+                            a_gen_name = h2h_data['h2h_gen_away']
+                            
+                            # Replicamos la estructura visual que te gusta
+                            st.markdown(f"<div style='margin: 8px 0;'><span class='home-color'>{h_gen_name}</span> <span class='score-value'>{h2h_data['res6']}</span> <span class='away-color'>{a_gen_name}</span></div>", unsafe_allow_html=True)
+                            st.markdown(f"**Handicap Inicial** <span class='ah-value'>{h2h_data['ah6']}</span>", unsafe_allow_html=True)
+
+                            # Mostramos las estadísticas detalladas si existen
+                            if h2h_data['match6_id']:
+                                display_previous_match_progression_stats(f"H2H Gen: {h_gen_name} vs {a_gen_name}", h2h_data['match6_id'], h_gen_name, a_gen_name)
+                        else:
+                            st.info("No se encontró H2H general.")
+
             st.divider()
             st.sidebar.success(f"🎉 Análisis completado en {time.time() - start_time:.2f} segundos.")
     else:
