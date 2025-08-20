@@ -532,15 +532,12 @@ def display_other_feature_ui2():
                
                 o_col1.metric(
                     "AH (Línea Inicial)",
-                    format_ah_as_decimal_string_of(main_match_odds_data.get('ah_linea_raw', '?')) or PLACEHOLDER_NODATA,
-                    f"L: {main_match_odds_data.get('ah_home_cuota', '-')} / V: {main_match_odds_data.get('ah_away_cuota', '-')}"
-                )
+                    format_ah_as_decimal_string_of(main_match_odds_data.get('ah_linea_raw', '?')) or PLACEHOLDER_NODATA)
                 
                 o_col2.metric(
                     "Goles (Línea Inicial)",
-                    format_ah_as_decimal_string_of(main_match_odds_data.get('goals_linea_raw', '?')) or PLACEHOLDER_NODATA,
-                    f"Más: {main_match_odds_data.get('goals_over_cuota', '-')} / Menos: {main_match_odds_data.get('goals_under_cuota', '-')}"
-                )
+                    format_ah_as_decimal_string_of(main_match_odds_data.get('goals_linea_raw', '?')) or PLACEHOLDER_NODATA)
+
 
             st.markdown("<h3 class='section-header' style='font-size:1.5em; margin-top:30px;'>⚡ Rendimiento Reciente y H2H Indirecto</h3>", unsafe_allow_html=True)
             rp_col1, rp_col2, rp_col3 = st.columns(3)
