@@ -586,7 +586,7 @@ def display_other_feature_ui2():
                 display_comp(comp_col2, title2, comp_V_vs_UL_H, away_name)
 
             st.divider()
-           with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
+         with st.expander("🔰 Hándicaps y Resultados Clave (H2H Directos)", expanded=True):
                 h2h_col1, h2h_col2 = st.columns(2)
                 with h2h_col1:
                     st.metric("Ultimo partido entre los dos equipos en este estadio", h2h_data['ah1'] if h2h_data['ah1'] != '-' else PLACEHOLDER_NODATA)
