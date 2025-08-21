@@ -167,11 +167,11 @@ def _analizar_precedente_handicap(precedente_data, ah_actual_num, favorito_actua
     familia_historica = _get_handicap_family(ah_historico_num)
 
     if familia_actual == familia_historica:
-        comparativa_texto = f"El mercado mantiene el <strong>mismo tipo de línea</strong> que el {format_ah_as_decimal_string_of(ah_raw)} de entonces. "
+        comparativa_texto = f"El mercado mantiene el <strong>mismo tipo de línea</strong> que el <p><strong style=font-size:25px;>{format_ah_as_decimal_string_of(ah_raw)}</strong></p> "
     elif familia_actual < familia_historica:
-        comparativa_texto = f"La linea ha bajado es decir el mercado considera que el equipo favorito es menos favorito que la ultima vez</strong> respecto al {format_ah_as_decimal_string_of(ah_raw)}. "
+        comparativa_texto = f"La linea ha bajado es decir el mercado considera que el equipo favorito es menos favorito que la ultima vez</strong> respecto al <p style='color: orange; font-weight: bold;font-size:25px;'>{format_ah_as_decimal_string_of(ah_raw)}<p> "
     elif familia_actual > familia_historica:
-        comparativa_texto = f"La linea ha subido y eso significa que el equipo favorito de hoy es mas favorito segun las casas de apuestas</strong> respecto al {format_ah_as_decimal_string_of(ah_raw)}. "
+        comparativa_texto = f"La linea ha subido y eso significa que el equipo favorito de hoy es mas favorito segun las casas de apuestas</strong> respecto al <p style='color: green; font-weight: bold; font-size:25px;'>{format_ah_as_decimal_string_of(ah_raw)}<p> "
 
     return f"<li><span class='ah-value'>Hándicap:</span> {comparativa_texto}Con el resultado ({res_raw.replace('-',':')}), la línea actual se habría considerado {cover_html}.</li>"
 
@@ -508,33 +508,94 @@ def extract_bet365_initial_odds_of(soup):
     return odds_info
 
 def extract_standings_data_from_h2h_page_of(soup, team_name):
-    data = {"name": team_name, "ranking": "N/A", "total_pj": "N/A", "total_v": "N/A", "total_e": "N/A", "total_d": "N/A", "total_gf": "N/A", "total_gc": "N/A", "specific_pj": "N/A", "specific_v": "N/A", "specific_e": "N/A", "specific_d": "N/A", "specific_gf": "N/A", "specific_gc": "N/A", "specific_type": "N/A"}
-    if not soup or not team_name or not (standings_section := soup.find("div", id="porletP4")): return data
-    team_table_soup, is_home_table = (None, False)
-    if (home_div := standings_section.find("div", class_="home-div")) and (header := home_div.find("tr", class_="team-home")) and team_name.lower() in header.get_text(strip=True).lower():
-        team_table_soup, is_home_table, data["specific_type"] = home_div.find("table"), True, "Est. como Local (en Liga)"
-    elif (guest_div := standings_section.find("div", class_="guest-div")) and (header := guest_div.find("tr", class_="team-guest")) and team_name.lower() in header.get_text(strip=True).lower():
-        team_table_soup, is_home_table, data["specific_type"] = guest_div.find("table"), False, "Est. como Visitante (en Liga)"
-    if not team_table_soup: return data
-    if (header_link := team_table_soup.find("tr", class_=re.compile(r"team-(home|guest)")).find("a")):
-        full_text = header_link.get_text(separator=" ", strip=True)
-        if (rank_match := re.search(r"..\[(?:[^\\]+)?-(\d+)\]", full_text)): data["ranking"] = rank_match.group(1)
-    in_ft = False
-    for row in team_table_soup.find_all("tr", align="center"):
-        if th := row.find("th"):
-            in_ft = "FT" in th.get_text(strip=True)
-            if "HT" in th.get_text(strip=True): break
-            continue
-        if in_ft and len(cells := row.find_all("td")) >= 7:
-            row_type = (cells[0].find("span") or cells[0]).get_text(strip=True)
-            stats = [cell.get_text(strip=True) or "N/A" for cell in cells[1:7]]
-            pj, v, e, d, gf, gc = stats
-            if row_type == "Total":
-                data.update({"total_pj": pj, "total_v": v, "total_e": e, "total_d": d, "total_gf": gf, "total_gc": gc})
-            elif (row_type == "Home" and is_home_table) or (row_type == "Away" and not is_home_table):
-                data.update({"specific_pj": pj, "specific_v": v, "specific_e": e, "specific_d": d, "specific_gf": gf, "specific_gc": gc})
-    return data
+    """
+    Extrae los datos de la tabla de clasificación (Standings) desde la página H2H.
+    Esta versión está corregida y es más robusta para parsear la estructura HTML.
+    """
+    # Diccionario de datos por defecto, se devuelve si no se encuentra información.
+    data = {
+        "name": team_name, "ranking": "N/A", "total_pj": "N/A", "total_v": "N/A",
+        "total_e": "N/A", "total_d": "N/A", "total_gf": "N/A", "total_gc": "N/A",
+        "specific_pj": "N/A", "specific_v": "N/A", "specific_e": "N/A",
+        "specific_d": "N/A", "specific_gf": "N/A", "specific_gc": "N/A",
+        "specific_type": "N/A"
+    }
 
+    if not soup or not team_name:
+        return data
+
+    # 1. Encontrar la sección principal de la clasificación
+    standings_section = soup.find("div", id="porletP4")
+    if not standings_section:
+        return data
+
+    team_table_soup = None
+    is_home_table = False
+
+    # 2. Identificar la tabla correcta (local o visitante) para el equipo buscado
+    home_div = standings_section.find("div", class_="home-div")
+    # Se busca el nombre del equipo en todo el bloque para más seguridad
+    if home_div and team_name.lower() in home_div.get_text(strip=True).lower():
+        team_table_soup = home_div.find("table", class_="team-table-home")
+        is_home_table = True
+        data["specific_type"] = "Est. como Local (en Liga)"
+    else:
+        guest_div = standings_section.find("div", class_="guest-div")
+        if guest_div and team_name.lower() in guest_div.get_text(strip=True).lower():
+            team_table_soup = guest_div.find("table", class_="team-table-guest")
+            is_home_table = False
+            data["specific_type"] = "Est. como Visitante (en Liga)"
+
+    if not team_table_soup:
+        return data  # Si no se encuentra la tabla del equipo, se retorna data vacía
+
+    # 3. Extraer el Ranking de la cabecera de la tabla
+    header_link = team_table_soup.find("a")
+    if header_link:
+        full_text = header_link.get_text(separator=" ", strip=True)
+        # Regex mejorada para encontrar el ranking, ej: [LIGA-6] -> 6
+        rank_match = re.search(r'\[.*?-(\d+)\]', full_text)
+        if rank_match:
+            data["ranking"] = rank_match.group(1)
+
+    # 4. Extraer las estadísticas (solo de la sección "Full Time")
+    all_rows = team_table_soup.find_all("tr", align="center")
+    is_ft_section = False  # Flag para saber si estamos en la sección de Full Time
+
+    for row in all_rows:
+        header_cell = row.find("th")
+        if header_cell:
+            header_text = header_cell.get_text(strip=True)
+            if "FT" in header_text:
+                is_ft_section = True
+            elif "HT" in header_text:
+                is_ft_section = False  # Al llegar a Half Time, dejamos de procesar
+            continue  # Saltar las filas de encabezado
+
+        # Procesar solo si estamos en la sección FT y la fila tiene suficientes celdas
+        if is_ft_section and len(cells := row.find_all("td")) >= 7:
+            # La primera celda (índice 0) indica el tipo de fila
+            row_type_element = cells[0].find("span") or cells[0]
+            row_type = row_type_element.get_text(strip=True)
+
+            # Extraer las 6 estadísticas clave: PJ, V, E, D, GF, GC
+            stats = [cell.get_text(strip=True) for cell in cells[1:7]]
+            pj, v, e, d, gf, gc = stats
+
+            if row_type == "Total":
+                data.update({
+                    "total_pj": pj, "total_v": v, "total_e": e,
+                    "total_d": d, "total_gf": gf, "total_gc": gc
+                })
+
+            # Guardar las estadísticas específicas (Local si es la tabla local, Visitante si es la visitante)
+            specific_row_needed = "Home" if is_home_table else "Away"
+            if row_type == specific_row_needed:
+                data.update({
+                    "specific_pj": pj, "specific_v": v, "specific_e": e,
+                    "specific_d": d, "specific_gf": gf, "specific_gc": gc
+                })
+    return data
 def extract_final_score_of(soup):
     try:
         scores = soup.select('#mScore .end .score')
