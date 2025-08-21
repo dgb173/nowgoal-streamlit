@@ -144,7 +144,11 @@ def _get_handicap_family(ah_num: float | None) -> tuple | None:
     return (signo, parte_entera, tipo_familia)
 
 def _analizar_precedente_handicap(precedente_data, ah_actual_num, favorito_actual_name, main_home_team_name):
-    """Función helper para generar la síntesis de Hándicap de UN solo precedente."""
+    """
+    Función helper para generar la síntesis de Hándicap de UN solo precedente.
+    VERSIÓN FINAL CORREGIDA: Identifica correctamente el favorito histórico y lo compara con el actual,
+    detectando cambios de favoritismo aunque la línea numérica sea similar.
+    """
     res_raw = precedente_data.get('res_raw')
     ah_raw = precedente_data.get('ah_raw')
     home_team_precedente = precedente_data.get('home')
@@ -154,27 +158,48 @@ def _analizar_precedente_handicap(precedente_data, ah_actual_num, favorito_actua
         return "<li><span class='ah-value'>Hándicap:</span> No hay datos suficientes en este precedente.</li>"
 
     ah_historico_num = parse_ah_to_number_of(ah_raw)
+    comparativa_texto = ""
+
+    if ah_historico_num is not None and ah_actual_num is not None:
+        # 1. Identificar al favorito del partido histórico.
+        # La línea de hándicap siempre es desde la perspectiva del equipo local.
+        # Positivo = Local favorito, Negativo = Visitante favorito.
+        favorito_historico_name = None
+        if ah_historico_num > 0:
+            favorito_historico_name = home_team_precedente
+        elif ah_historico_num < 0:
+            favorito_historico_name = away_team_precedente
+        
+        # 2. Comparar los favoritos y las magnitudes
+        if favorito_actual_name.lower() == (favorito_historico_name or "").lower():
+            # El favorito es el mismo equipo, ahora comparamos la magnitud.
+            if abs(ah_actual_num) > abs(ah_historico_num):
+                comparativa_texto = f"El mercado considera a este equipo <strong>más favorito</strong> que en el precedente (línea histórica: <strong style='color: green; font-size:1.2em;'>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
+            elif abs(ah_actual_num) < abs(ah_historico_num):
+                comparativa_texto = f"El mercado considera a este equipo <strong>menos favorito</strong> que en el precedente (línea histórica: <strong style='color: orange; font-size:1.2em;'>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
+            else:
+                comparativa_texto = f"El mercado mantiene una línea de <strong>magnitud idéntica</strong> a la del precedente (<strong>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
+        else:
+            # Los equipos favoritos son diferentes: ¡el caso que detectaste!
+            if favorito_historico_name:
+                comparativa_texto = f"Ha habido un <strong>cambio total de favoritismo</strong>. En el precedente el favorito era '{favorito_historico_name}' (línea: <strong style='color: red; font-size:1.2em;'>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
+            else: # Caso donde antes no había favorito (línea 0) y ahora sí.
+                 comparativa_texto = f"El mercado ahora establece un favorito claro, a diferencia del precedente que tenía una línea de <strong>{format_ah_as_decimal_string_of(ah_raw)}</strong>. "
+
+    else:
+        comparativa_texto = f"No se pudo realizar una comparación detallada (línea histórica: <strong>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
+
+    # 3. Simular el resultado del hándicap
     resultado_cover, cubierto = check_handicap_cover(res_raw, ah_actual_num, favorito_actual_name, home_team_precedente, away_team_precedente, main_home_team_name)
     
     if cubierto is True:
         cover_html = f"<span style='color: green; font-weight: bold;'>CUBIERTO ✅</span>"
     elif cubierto is False:
         cover_html = f"<span style='color: red; font-weight: bold;'>NO CUBIERTO ❌</span>"
-    else: # PUSH or indeterminado
+    else: # PUSH o indeterminado
         cover_html = f"<span style='color: #6c757d; font-weight: bold;'>{resultado_cover.upper()} 🤔</span>"
 
-    familia_actual = _get_handicap_family(ah_actual_num)
-    familia_historica = _get_handicap_family(ah_historico_num)
-
-    if familia_actual == familia_historica:
-        comparativa_texto = f"El mercado mantiene el <strong>mismo tipo de línea</strong> que el <p><strong style=font-size:25px;>{format_ah_as_decimal_string_of(ah_raw)}</strong></p> "
-    elif familia_actual < familia_historica:
-        comparativa_texto = f"La linea ha bajado es decir el mercado considera que el equipo favorito es menos favorito que la ultima vez</strong> respecto al <p style='color: orange; font-weight: bold;font-size:25px;'>{format_ah_as_decimal_string_of(ah_raw)}<p> "
-    elif familia_actual > familia_historica:
-        comparativa_texto = f"La linea ha subido y eso significa que el equipo favorito de hoy es mas favorito segun las casas de apuestas</strong> respecto al <p style='color: green; font-weight: bold; font-size:25px;'>{format_ah_as_decimal_string_of(ah_raw)}<p> "
-
     return f"<li><span class='ah-value'>Hándicap:</span> {comparativa_texto}Con el resultado ({res_raw.replace('-',':')}), la línea actual se habría considerado {cover_html}.</li>"
-
 def _analizar_precedente_goles(precedente_data, goles_actual_num):
     """Función helper para generar la síntesis de Goles de UN solo precedente."""
     res_raw = precedente_data.get('res_raw')
