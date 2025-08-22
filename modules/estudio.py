@@ -19,7 +19,7 @@ from selenium.common.exceptions import TimeoutException, WebDriverException, Ele
 
 # --- CONFIGURACIÓN GLOBAL ---
 BASE_URL_OF = "https://live18.nowgoal25.com"
-SELENIUM_TIMEOUT_SECONDS_OF = 10 
+SELENIUM_TIMEOUT_SECONDS_OF = 10
 SELENIUM_POLL_FREQUENCY_OF = 0.2
 PLACEHOLDER_NODATA = "*(No disponible)*"
 
@@ -146,8 +146,8 @@ def _get_handicap_family(ah_num: float | None) -> tuple | None:
 def _analizar_precedente_handicap(precedente_data, ah_actual_num, favorito_actual_name, main_home_team_name):
     """
     Función helper para generar la síntesis de Hándicap de UN solo precedente.
-    VERSIÓN FINAL CORREGIDA: Identifica correctamente el favorito histórico y lo compara con el actual,
-    detectando cambios de favoritismo aunque la línea numérica sea similar.
+    VERSIÓN FINAL CORREGIDA Y MEJORADA: Unifica la lógica para todos los cambios de favoritismo,
+    incluyendo desde/hacia una línea de 0, y siempre muestra el movimiento de la línea.
     """
     res_raw = precedente_data.get('res_raw')
     ah_raw = precedente_data.get('ah_raw')
@@ -161,31 +161,37 @@ def _analizar_precedente_handicap(precedente_data, ah_actual_num, favorito_actua
     comparativa_texto = ""
 
     if ah_historico_num is not None and ah_actual_num is not None:
+        formatted_ah_historico = format_ah_as_decimal_string_of(ah_raw)
+        formatted_ah_actual = format_ah_as_decimal_string_of(str(ah_actual_num))
+        line_movement_str = f"{formatted_ah_historico} → {formatted_ah_actual}"
+        
         # 1. Identificar al favorito del partido histórico.
-        # La línea de hándicap siempre es desde la perspectiva del equipo local.
-        # Positivo = Local favorito, Negativo = Visitante favorito.
         favorito_historico_name = None
         if ah_historico_num > 0:
             favorito_historico_name = home_team_precedente
         elif ah_historico_num < 0:
             favorito_historico_name = away_team_precedente
         
-        # 2. Comparar los favoritos y las magnitudes
+        # 2. Lógica de comparación unificada
         if favorito_actual_name.lower() == (favorito_historico_name or "").lower():
-            # El favorito es el mismo equipo, ahora comparamos la magnitud.
+            # El favorito es el mismo equipo (o ambos son 'Ninguno'), ahora comparamos la magnitud.
             if abs(ah_actual_num) > abs(ah_historico_num):
-                comparativa_texto = f"El mercado considera a este equipo <strong>más favorito</strong> que en el precedente (línea histórica: <strong style='color: green; font-size:1.2em;'>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
+                comparativa_texto = f"El mercado considera a este equipo <strong>más favorito</strong> que en el precedente (movimiento: <strong style='color: green; font-size:1.2em;'>{line_movement_str}</strong>). "
             elif abs(ah_actual_num) < abs(ah_historico_num):
-                comparativa_texto = f"El mercado considera a este equipo <strong>menos favorito</strong> que en el precedente (línea histórica: <strong style='color: orange; font-size:1.2em;'>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
+                comparativa_texto = f"El mercado considera a este equipo <strong>menos favorito</strong> que en el precedente (movimiento: <strong style='color: orange; font-size:1.2em;'>{line_movement_str}</strong>). "
             else:
-                comparativa_texto = f"El mercado mantiene una línea de <strong>magnitud idéntica</strong> a la del precedente (<strong>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
+                comparativa_texto = f"El mercado mantiene una línea de <strong>magnitud idéntica</strong> a la del precedente (<strong>{formatted_ah_historico}</strong>). "
         else:
-            # Los equipos favoritos son diferentes: ¡el caso que detectaste!
-            if favorito_historico_name:
-                comparativa_texto = f"Ha habido un <strong>cambio total de favoritismo</strong>. En el precedente el favorito era '{favorito_historico_name}' (línea: <strong style='color: red; font-size:1.2em;'>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
-            else: # Caso donde antes no había favorito (línea 0) y ahora sí.
-                 comparativa_texto = f"El mercado ahora establece un favorito claro, a diferencia del precedente que tenía una línea de <strong>{format_ah_as_decimal_string_of(ah_raw)}</strong>. "
-
+            # Los favoritos han cambiado (A->B, Ninguno->A, o A->Ninguno).
+            if favorito_historico_name and favorito_actual_name != "Ninguno (línea en 0)":
+                # Caso 1: Cambio total de favorito de un equipo a otro.
+                comparativa_texto = f"Ha habido un <strong>cambio total de favoritismo</strong>. En el precedente el favorito era '{favorito_historico_name}' (movimiento: <strong style='color: red; font-size:1.2em;'>{line_movement_str}</strong>). "
+            elif not favorito_historico_name:
+                # Caso 2: Se establece un favorito donde antes no lo había (línea 0).
+                comparativa_texto = f"El mercado establece un favorito claro, considerándolo <strong>mucho más favorito</strong> que en el precedente (movimiento: <strong style='color: green; font-size:1.2em;'>{line_movement_str}</strong>). "
+            else: # favorito_actual_name es "Ninguno (línea en 0)"
+                # Caso 3: Se elimina un favorito que antes existía.
+                comparativa_texto = f"El mercado <strong>ha eliminado al favorito</strong> ('{favorito_historico_name}') que existía en el precedente (movimiento: <strong style='color: orange; font-size:1.2em;'>{line_movement_str}</strong>). "
     else:
         comparativa_texto = f"No se pudo realizar una comparación detallada (línea histórica: <strong>{format_ah_as_decimal_string_of(ah_raw)}</strong>). "
 
@@ -199,7 +205,8 @@ def _analizar_precedente_handicap(precedente_data, ah_actual_num, favorito_actua
     else: # PUSH o indeterminado
         cover_html = f"<span style='color: #6c757d; font-weight: bold;'>{resultado_cover.upper()} 🤔</span>"
 
-    return f"<li><span class='ah-value'>Hándicap:</span> {comparativa_texto}Con el resultado ({res_raw.replace('-',':')}), la línea actual se habría considerado {cover_html}.</li>"
+    return f"<li><span class='ah-value'>Hándicap:</span> {comparativa_texto}Con el resultado ({res_raw.replace('-' , ':')}), la línea actual se habría considerado {cover_html}.</li>"
+
 def _analizar_precedente_goles(precedente_data, goles_actual_num):
     """Función helper para generar la síntesis de Goles de UN solo precedente."""
     res_raw = precedente_data.get('res_raw')
@@ -239,7 +246,8 @@ def generar_analisis_completo_mercado(main_odds, h2h_data, home_name, away_name)
     
     titulo_html = f"<p style='margin-bottom: 12px;'><strong>📊 Análisis de Mercado vs. Histórico H2H</strong><br><span style='font-style: italic; font-size: 0.9em;'>Líneas actuales: AH {ah_actual_str} / Goles {goles_actual_num} | Favorito: {favorito_html}</span></p>"
 
-    # --- Análisis del Precedente en Este Estadio ---
+    # ---
+    # Análisis del Precedente en Este Estadio ---
     precedente_estadio = {
         'res_raw': h2h_data.get('res1_raw'), 'ah_raw': h2h_data.get('ah1'),
         'home': home_name, 'away': away_name, 'match_id': h2h_data.get('match1_id')
@@ -247,7 +255,8 @@ def generar_analisis_completo_mercado(main_odds, h2h_data, home_name, away_name)
     sintesis_ah_estadio = _analizar_precedente_handicap(precedente_estadio, ah_actual_num, favorito_name, home_name)
     sintesis_goles_estadio = _analizar_precedente_goles(precedente_estadio, goles_actual_num)
     
-    # --- FIX DEFINITIVO --- Se usa un formato de string limpio para evitar errores de sintaxis
+    # ---
+    # FIX DEFINITIVO --- Se usa un formato de string limpio para evitar errores de sintaxis
     analisis_estadio_html = (
         f"<div style='margin-bottom: 10px;'>"
         f"  <strong style='font-size: 1.05em;'>🏟️ Análisis del Precedente en Este Estadio</strong>"
@@ -255,7 +264,8 @@ def generar_analisis_completo_mercado(main_odds, h2h_data, home_name, away_name)
         f"</div>"
     )
 
-    # --- Análisis del H2H General (con manejo de duplicados) ---
+    # ---
+    # Análisis del H2H General (con manejo de duplicados) ---
     precedente_general_id = h2h_data.get('match6_id')
     
     # Comprobamos si los IDs son válidos y si son iguales
@@ -279,7 +289,8 @@ def generar_analisis_completo_mercado(main_odds, h2h_data, home_name, away_name)
         sintesis_ah_general = _analizar_precedente_handicap(precedente_general, ah_actual_num, favorito_name, home_name)
         sintesis_goles_general = _analizar_precedente_goles(precedente_general, goles_actual_num)
         
-        # --- FIX DEFINITIVO --- Se usa un formato de string limpio para evitar errores de sintaxis
+        # ---
+        # FIX DEFINITIVO --- Se usa un formato de string limpio para evitar errores de sintaxis
         analisis_general_html = (
             f"<div>"
             f"  <strong style='font-size: 1.05em;'>✈️ Análisis del H2H General Más Reciente</strong>"
@@ -479,7 +490,7 @@ def get_team_league_info_from_script_of(soup):
     content = script_tag.string
     def find_val(pattern):
         match = re.search(pattern, content)
-        return match.group(1).replace("\"", "'") if match else None
+        return match.group(1).replace("\\'", "'") if match else None
     home_id = find_val(r"hId:\s*parseInt\('(\d+)'\)")
     away_id = find_val(r"gId:\s*parseInt\('(\d+)'\)")
     league_id = find_val(r"sclassId:\s*parseInt\('(\d+)'\)")
@@ -621,6 +632,60 @@ def extract_standings_data_from_h2h_page_of(soup, team_name):
                     "specific_d": d, "specific_gf": gf, "specific_gc": gc
                 })
     return data
+
+def extract_over_under_stats_from_div_of(soup, team_type: str):
+    """
+    Extrae las estadísticas de Over/Under directamente desde el div de resumen.
+    team_type: 'home' o 'away'
+    """
+    default_stats = {"over_pct": 0, "under_pct": 0, "push_pct": 0, "total": 0}
+    if not soup:
+        return default_stats
+
+    table_id = "table_v1" if team_type == 'home' else "table_v2"
+    table = soup.find("table", id=table_id)
+    if not table:
+        return default_stats
+
+    # Encontrar la sección de estadísticas
+    y_bar = table.find("ul", class_="y-bar")
+    if not y_bar:
+        return default_stats
+
+    # Buscar el grupo de Over/Under
+    ou_group = None
+    for group in y_bar.find_all("li", class_="group"):
+        if "Over/Under Odds" in group.get_text():
+            ou_group = group
+            break
+    
+    if not ou_group:
+        return default_stats
+
+    try:
+        # Extraer el total de partidos
+        total_text = ou_group.find("div", class_="tit").find("span").get_text(strip=True)
+        total_match = re.search(r'\((\d+)\s*games\)', total_text)
+        total = int(total_match.group(1)) if total_match else 0
+
+        # Extraer los porcentajes
+        values = ou_group.find_all("span", class_="value")
+        if len(values) == 3:
+            over_pct_text = values[0].get_text(strip=True).replace('%', '')
+            push_pct_text = values[1].get_text(strip=True).replace('%', '')
+            under_pct_text = values[2].get_text(strip=True).replace('%', '')
+
+            return {
+                "over_pct": float(over_pct_text),
+                "under_pct": float(under_pct_text),
+                "push_pct": float(push_pct_text),
+                "total": total
+            }
+    except (ValueError, TypeError, AttributeError):
+        return default_stats
+
+    return default_stats
+
 def extract_final_score_of(soup):
     try:
         scores = soup.select('#mScore .end .score')
@@ -724,6 +789,8 @@ def display_other_feature_ui2():
             home_id, away_id, league_id, home_name, away_name, _ = get_team_league_info_from_script_of(soup_completo)
             home_standings = extract_standings_data_from_h2h_page_of(soup_completo, home_name)
             away_standings = extract_standings_data_from_h2h_page_of(soup_completo, away_name)
+            home_ou_stats = extract_over_under_stats_from_div_of(soup_completo, 'home')
+            away_ou_stats = extract_over_under_stats_from_div_of(soup_completo, 'away')
             key_match_id_rival_a, rival_a_id, rival_a_name = get_rival_a_for_original_h2h_of(soup_completo, league_id)
             _, rival_b_id, rival_b_name = get_rival_b_for_original_h2h_of(soup_completo, league_id)
             last_home_match = extract_last_match_in_league_of(soup_completo, "table_v1", home_name, league_id, True)
@@ -737,11 +804,12 @@ def display_other_feature_ui2():
                 future_h2h_col3 = executor.submit(get_h2h_details_for_original_logic_of, driver, key_match_id_rival_a, rival_a_id, rival_b_id, rival_a_name, rival_b_name)
                 details_h2h_col3 = future_h2h_col3.result()
 
-            # --- RENDERIZACIÓN DE LA UI ---
+            # ---
+            # RENDERIZACIÓN DE LA UI ---
             st.markdown(f"<h1 class='main-title'>Análisis de Partido Avanzado (OF)</h1>", unsafe_allow_html=True)
             st.markdown(f"<p class='sub-title'><span class='home-color'>{home_name}</span> vs <span class='away-color'>{away_name}</span></p>", unsafe_allow_html=True)
 
-            with st.expander("📊 Clasificación en Liga", expanded=True):
+            with st.expander("📊 Clasificación en Liga y Estadísticas O/U", expanded=True):
                 scol1, scol2 = st.columns(2)
                 def display_standings(col, data, team_color_class):
                     with col:
@@ -754,8 +822,32 @@ def display_other_feature_ui2():
                             st.markdown(f"**PJ:** {data['specific_pj']} | **V-E-D:** {data['specific_v']}-{data['specific_e']}-{data['specific_d']} | **GF:GC:** {data['specific_gf']}:{data['specific_gc']}")
                         else:
                             st.info("Datos de clasificación no disponibles.")
+                
                 display_standings(scol1, home_standings, "home-color")
                 display_standings(scol2, away_standings, "away-color")
+
+                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+
+                def display_over_under_stats(col, stats):
+                    with col:
+                        st.markdown(f"<h6 style='text-align: center; margin-top: 15px;'>Over/Under Odds % (Últ. {stats['total']} partidos)</h6>", unsafe_allow_html=True)
+                        if stats['total'] > 0:
+                            over_pct = stats['over_pct']
+                            under_pct = stats['under_pct']
+                            push_pct = stats['push_pct']
+                            html = f"""
+                            <div style='text-align: center;'>
+                                <span style='color: green; font-weight: bold;'>Over: {over_pct:.1f}%</span> |
+                                <span style='color: red; font-weight: bold;'>Under: {under_pct:.1f}%</span> |
+                                <span style='color: grey; font-weight: bold;'>Push: {push_pct:.1f}%</span>
+                            </div>
+                            """
+                            st.markdown(html, unsafe_allow_html=True)
+                        else:
+                            st.markdown("<p style='text-align: center;'>No hay datos de partidos para calcular.</p>", unsafe_allow_html=True)
+
+                display_over_under_stats(scol1, home_ou_stats)
+                display_over_under_stats(scol2, away_ou_stats)
 
             st.markdown("<h2 class='section-header'>🎯 Análisis Detallado del Partido</h2>", unsafe_allow_html=True)
             
@@ -838,7 +930,8 @@ def display_other_feature_ui2():
 
             st.divider() 
             
-            # --- CÁLCULO Y RENDERIZADO DEL ANÁLISIS DE MERCADO COMPLETO ---
+            # ---
+            # CÁLCULO Y RENDERIZADO DEL ANÁLISIS DE MERCADO COMPLETO ---
             with st.spinner("🔍 Generando análisis de mercado..."):
                 analisis_texto = generar_analisis_completo_mercado(main_match_odds_data, h2h_data, home_name, away_name)
                 if analisis_texto:
